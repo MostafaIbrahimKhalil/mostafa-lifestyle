@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import '@fontsource/amiri-quran/arabic-400.css'
 import Icon from '../components/Icon.jsx'
 import { setCheck, setSetting } from '../db.js'
 import { num } from '../lib/dates.js'
 import QURAN from '../data/quran-index.json'
+import { errorText, listen, makeFollower, normalize, speechSupported } from '../lib/recite.js'
 
 const SURAH = Object.fromEntries(QURAN.surahs.map((s) => [s.n, s]))
 const BASMALA = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ'
@@ -78,6 +79,81 @@ export default function QuranReader({ juz, today, settings, onClose }) {
     return i < 0 ? 0 : i
   }, [rows, pos])
   const pct = rows ? Math.round(((idx + 1) / rows.length) * 100) : 0
+
+  // ===== القراية بصوتك: النص باهت ٥٠٪ والكلمة اللي بتقراها بتنوّر =====
+  // كل كلمة ليها رقم (data-w) — بنلوّن بالـ DOM مباشرة عشان الجزء فيه آلاف الكلمات
+  const words = useMemo(() => {
+    if (!rows) return null
+    let i = 0
+    const perRow = rows.map((r) =>
+      r.t.split(' ').map((raw) => {
+        const n = normalize(raw)
+        return { raw, n, i: n ? i++ : -1 }
+      }),
+    )
+    const expected = perRow.flat().filter((w) => w.n).map((w) => w.n)
+    const firstOfRow = perRow.map((ws) => ws.find((w) => w.i >= 0)?.i ?? 0)
+    return { perRow, expected, firstOfRow }
+  }, [rows])
+  const [follow, setFollow] = useState(null) // null | 'on' | 'paused'
+  const [followErr, setFollowErr] = useState(null)
+  const follower = useRef(null)
+  const painted = useRef(0)
+  const stopRef = useRef(null)
+
+  useEffect(() => () => stopRef.current?.(), [])
+
+  function paint(c) {
+    const root = scroller.current
+    if (!root) return
+    const from = painted.current
+    if (c > from) for (let i = from; i < c; i++) root.querySelector(`[data-w="${i}"]`)?.classList.add('rd')
+    else for (let i = c; i < from; i++) root.querySelector(`[data-w="${i}"]`)?.classList.remove('rd')
+    painted.current = c
+    const el = root.querySelector(`[data-w="${Math.max(0, c - 1)}"]`)
+    if (el && c > from) {
+      const r = el.getBoundingClientRect()
+      const h = root.clientHeight
+      if (r.top > h * 0.62 || r.top < 80) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }
+
+  function startFollow() {
+    setFollowErr(null)
+    if (!follower.current) {
+      const start = words.firstOfRow[idx] || 0
+      follower.current = makeFollower(words.expected, start)
+      painted.current = start
+      // اللي قبل مكان البداية يتحسب مقروء
+      for (let i = 0; i < start; i++) scroller.current?.querySelector(`[data-w="${i}"]`)?.classList.add('rd')
+    } else follower.current.restart()
+    scroller.current?.querySelector('.juz-text')?.classList.add('follow')
+    try {
+      stopRef.current = listen({
+        onText: (_full, fin, interim) => paint(follower.current.feed(fin, interim)),
+        onError: (code) => {
+          setFollowErr(errorText(code))
+          setFollow('paused')
+        },
+        onEnd: () => setFollow((f) => (f === 'on' ? 'paused' : f)),
+      })
+      setFollow('on')
+    } catch (e) {
+      setFollowErr(errorText(e.name || 'start'))
+    }
+  }
+
+  function stopFollow() {
+    stopRef.current?.()
+    stopRef.current = null
+    setFollow('paused')
+  }
+
+  function exitFollow() {
+    stopFollow()
+    scroller.current?.querySelector('.juz-text')?.classList.remove('follow')
+    setFollow(null)
+  }
   const page = rows?.[idx]?.p
 
   async function finish() {
@@ -123,7 +199,7 @@ export default function QuranReader({ juz, today, settings, onClose }) {
       <div className="reader-body" ref={scroller} style={{ '--qfs': `${FONT_SIZES[fontIdx]}px` }}>
         {error && <p className="muted center">{error}. اتأكد إن النت شغال أول مرة بس.</p>}
         {!rows && !error && <p className="muted center">بيفتح الجزء…</p>}
-        {rows && <JuzText rows={rows} />}
+        {rows && <JuzText rows={rows} words={words.perRow} />}
         {rows && (
           <div className="reader-end">
             <p className="muted center">صدق الله العظيم</p>
@@ -134,12 +210,36 @@ export default function QuranReader({ juz, today, settings, onClose }) {
           </div>
         )}
       </div>
+
+      {rows && speechSupported() && (
+        <div className={`follow-bar ${follow === 'on' ? 'is-on' : ''}`}>
+          {followErr && <small className="late">{followErr}</small>}
+          {follow === 'on' && <small>بسمعك… الكلمة اللي بتقراها بتنوّر</small>}
+          <div className="row">
+            {follow === 'on' ? (
+              <button className="btn follow-btn" onClick={stopFollow}>
+                <span className="rec-dot" /> وقّف
+              </button>
+            ) : (
+              <button className="btn follow-btn" onClick={startFollow}>
+                <Icon name="mic" size={20} /> {follow ? 'كمّل' : 'اقرا بصوتك'}
+              </button>
+            )}
+            {follow === 'paused' && (
+              <button className="btn btn-ghost" onClick={exitFollow}>
+                النص كامل
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function JuzText({ rows }) {
+const JuzText = memo(function JuzText({ rows, words }) {
   // نقسّم الآيات لمجموعات: رأس سورة، بسملة، علامة صفحة، وفقرة آيات
+  const rowIndex = new Map(rows.map((r, i) => [r, i]))
   const groups = []
   let para = null
   let lastPage = null
@@ -192,7 +292,11 @@ function JuzText({ rows }) {
           <p key={`t${first.s}-${first.a}`} className="quran-text">
             {g.ayahs.map((r) => (
               <span key={`${r.s}:${r.a}`} data-k={`${r.s}:${r.a}`} className="ayah">
-                {r.t}
+                {words[rowIndex.get(r)].map((w, k) => (
+                  <span key={k} className={w.i >= 0 ? 'w' : undefined} data-w={w.i >= 0 ? w.i : undefined}>
+                    {w.raw}{' '}
+                  </span>
+                ))}
                 <span className="ayah-no">{num(r.a)}</span>
                 {r.sj ? (
                   <span className="sajda" title="سجدة">
@@ -206,4 +310,4 @@ function JuzText({ rows }) {
       })}
     </div>
   )
-}
+})

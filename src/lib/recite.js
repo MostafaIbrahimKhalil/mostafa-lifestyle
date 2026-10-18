@@ -84,7 +84,7 @@ export function listen({ onText, onError, onEnd }) {
       if (r.isFinal) finals += ' ' + r[0].transcript
       else interim += ' ' + r[0].transcript
     }
-    onText((finals + interim).trim())
+    onText((finals + interim).trim(), finals.trim(), interim.trim())
   }
   rec.onerror = (e) => {
     if (e.error === 'no-speech' || e.error === 'aborted') return
@@ -121,4 +121,55 @@ export function errorText(code) {
   if (code === 'audio-capture') return 'مش لاقي مايك شغال.'
   if (code === 'language-not-supported') return 'العربي مش متاح في الإملاء على الموبايل ده. ضيف العربي من إعدادات لوحة المفاتيح.'
   return `حصلت مشكلة في التسجيل (${code}).`
+}
+
+// متابعة القراية في الورد: بنمشي على كلمات الجزء ونعرف إنت وصلت لحد فين
+export function makeFollower(expected, startAt = 0) {
+  const LOOK = 6
+  let st = { cursor: startAt, misses: 0, prev: null }
+  let finalsSeen = 0
+
+  function step(s, w) {
+    for (let k = 0; k <= LOOK && s.cursor + k < expected.length; k++) {
+      if (similar(expected[s.cursor + k], w.n)) {
+        s.cursor += k + 1
+        s.misses = 0
+        s.prev = w
+        return
+      }
+    }
+    s.misses++
+    // تُهت؟ ندور على الكلمتين اللي فاتوا ورا بعض في اللي جاي
+    if (s.misses >= 3 && s.prev) {
+      for (let j = s.cursor; j < Math.min(expected.length - 1, s.cursor + 80); j++) {
+        if (similar(expected[j], s.prev.n) && similar(expected[j + 1], w.n)) {
+          s.cursor = j + 2
+          s.misses = 0
+          break
+        }
+      }
+    }
+    s.prev = w
+  }
+
+  return {
+    // بترجع لحد فين وصلت (مع الكلام اللي لسه بيتكتب)
+    feed(finalsText, interimText) {
+      const fw = splitWords(finalsText)
+      for (let i = finalsSeen; i < fw.length; i++) step(st, fw[i])
+      finalsSeen = fw.length
+      const t = { ...st }
+      for (const w of splitWords(interimText)) step(t, w)
+      return Math.max(st.cursor, t.cursor)
+    },
+    restart() {
+      finalsSeen = 0
+    },
+    get cursor() {
+      return st.cursor
+    },
+    moveTo(i) {
+      st = { cursor: i, misses: 0, prev: null }
+    },
+  }
 }

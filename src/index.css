@@ -2832,3 +2832,53 @@ details[open] > summary.bal-head::after {
   cursor: pointer;
   margin: 8px 0;
 }
+
+/* ===== القراية بصوتك في الورد ===== */
+.juz-text.follow .w {
+  opacity: 0.5;
+  transition: opacity 0.25s;
+}
+.juz-text.follow .w.rd {
+  opacity: 1;
+}
+.follow-bar {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  inset-inline: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.follow-bar > * {
+  pointer-events: auto;
+}
+.follow-bar small {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  max-width: 90%;
+  text-align: center;
+}
+.follow-btn {
+  border-radius: 999px;
+  padding-inline: 22px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+.follow-bar.is-on .follow-btn {
+  background: var(--c-health);
+}
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+.reader-end {
+  padding-bottom: 90px;
+}
