@@ -1,6 +1,6 @@
 // إضافة خطة أكتوبر ونوفمبر للتطبيق — مرة واحدة بس
 import { db, getSetting, setSetting } from '../db.js'
-import { DW_NOTE, DW_STEPS, GERMAN_WORDS_TASKS, PLAN_APPTS, PLAN_DAILY, PLAN_GOALS, PLAN_POSTS, PLAN_TASKS } from '../data/plan2026.js'
+import { BLENDER_GOAL, BLENDER_TASKS, DW_NOTE, DW_STEPS, GERMAN_WORDS_TASKS, PLAN_APPTS, PLAN_DAILY, PLAN_GOALS, PLAN_POSTS, PLAN_TASKS } from '../data/plan2026.js'
 
 const stepsOf = (titles) => titles.map((title, i) => ({ id: Date.now() + i + Math.random(), title, done: false }))
 
@@ -15,6 +15,12 @@ export async function seedPlan() {
         t.title = 'كروت الألماني التعليمية: ساعة (٧–٨ بالليل)'
       }),
   )
+  await seedOnce('seededBlender', async () => {
+    const now = new Date().toISOString()
+    await db.tasks.bulkAdd(BLENDER_TASKS.map((t) => ({ kind: 'once', done: false, active: true, createdAt: now, plan: 'blender-home', ...t })))
+    const order = (await db.goals.count()) + 1
+    await db.goals.add({ ...BLENDER_GOAL, steps: stepsOf(BLENDER_GOAL.steps), done: false, status: 'active', order })
+  })
   if (await getSetting('seededPlan2026', false)) return
   const now = new Date().toISOString()
   await db.transaction('rw', [db.tasks, db.goals, db.posts, db.appts, db.settings], async () => {
@@ -47,7 +53,7 @@ export async function seedPlan() {
 }
 
 async function seedOnce(key, fn) {
-  await db.transaction('rw', [db.tasks, db.settings], async () => {
+  await db.transaction('rw', [db.tasks, db.goals, db.settings], async () => {
     if (await getSetting(key, false)) return
     await fn()
     await setSetting(key, true)
