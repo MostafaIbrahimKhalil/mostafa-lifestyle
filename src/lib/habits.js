@@ -10,7 +10,8 @@ const DAILY_MULTIPLIER = Math.pow(0.5, 1 / 13)
 
 export function habitDefs(settings, tasks) {
   const defs = [
-    ...PRAYERS.map((p) => ({ id: `prayer:${p.id}`, name: `صلاة ${p.name}`, aspect: 'faith', group: 'الصلاة' })),
+    // الصلاة ما ليهاش يوم عذر
+    ...PRAYERS.map((p) => ({ id: `prayer:${p.id}`, name: `صلاة ${p.name}`, aspect: 'faith', group: 'الصلاة', noSkip: true })),
     { id: 'tasbih', name: 'التسبيح بعد الصلوات', aspect: 'faith', group: 'الأذكار', needs: PRAYERS.map((p) => `tasbih:${p.id}`) },
     { id: 'adhkar:morning', name: 'أذكار الصباح', aspect: 'faith', group: 'الأذكار' },
     { id: 'adhkar:evening', name: 'أذكار المساء', aspect: 'faith', group: 'الأذكار' },
@@ -56,22 +57,31 @@ export function habitStats(def, byDate, firstUse, now = new Date()) {
   const startKey = [firstUse || today, def.start || firstUse || today].sort().pop()
   const days = []
   for (let d = fromKey(startKey); dateKey(d) <= today; d = addDays(d, 1)) days.push(dateKey(d))
-  const done = days.map((k) => isDone(def, byDate.get(k)))
-  const todayDone = done[done.length - 1]
+  // كل يوم: 'done' اتعمل، 'skip' يوم عذر (ما بيكسرش ولا بيزوّد)، 'miss' فات
+  const states = days.map((k) => {
+    const set = byDate.get(k)
+    if (isDone(def, set)) return 'done'
+    if (!def.noSkip && set?.has('day:excused')) return 'skip'
+    return 'miss'
+  })
+  const todayDone = states[states.length - 1] === 'done'
+  // الأيام اللي خلصت (النهارده يدخل بس لو اتعمل)
+  const closedStates = todayDone ? states : states.slice(0, -1)
 
   // العدّاد المتتالي: النهارده لو لسه ما اتعملش ما بيكسرش السلسلة
   let current = 0
-  for (let i = done.length - 1 - (todayDone ? 0 : 1); i >= 0 && done[i]; i--) current++
+  for (let i = closedStates.length - 1; i >= 0 && closedStates[i] !== 'miss'; i--) if (closedStates[i] === 'done') current++
 
   let best = 0
   let run = 0
-  for (const d of done) {
-    run = d ? run + 1 : 0
+  for (const st of closedStates) {
+    if (st === 'done') run++
+    else if (st === 'miss') run = 0
     best = Math.max(best, run)
   }
 
-  // الأيام اللي خلصت (من غير النهارده لو لسه ما اتعملش)
-  const closed = todayDone ? done : done.slice(0, -1)
+  const counted = closedStates.filter((st) => st !== 'skip')
+  const closed = counted.map((st) => st === 'done')
   const rate = (n) => {
     const slice = closed.slice(-n)
     return slice.length ? slice.filter(Boolean).length / slice.length : null
@@ -79,11 +89,14 @@ export function habitStats(def, byDate, firstUse, now = new Date()) {
 
   let score = 0
   for (const d of closed) score = score * DAILY_MULTIPLIER + (d ? 1 - DAILY_MULTIPLIER : 0)
-  if (todayDone) score = score * DAILY_MULTIPLIER + (1 - DAILY_MULTIPLIER)
 
   const last7 = closed.slice(-7)
   const misses7 = last7.filter((d) => !d).length
   const r30 = rate(30)
+  const done = states.map((st) => st === 'done')
+  // "متفوتهاش مرتين": فاتت امبارح بس، واليوم اللي قبله كان معمول
+  const yIdx = states.length - 2
+  const missedYesterdayOnly = yIdx >= 1 && states[yIdx] === 'miss' && states[yIdx - 1] === 'done' && !todayDone
 
   let status
   if (current >= FORMED_DAYS) status = 'formed'
@@ -105,6 +118,7 @@ export function habitStats(def, byDate, firstUse, now = new Date()) {
     score,
     status,
     toFormed: Math.max(0, FORMED_DAYS - current),
+    missedYesterdayOnly,
     last14: done.slice(-14),
   }
 }

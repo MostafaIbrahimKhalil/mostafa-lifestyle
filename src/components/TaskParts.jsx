@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { addDays, dateKey, formatShortDate, fromKey, num } from '../lib/dates.js'
 import { PRIORITY, TASK_CATS, addTask, catOf, removeTask, toggleTask } from '../lib/tasks.js'
+import { db } from '../db.js'
 
 export function CheckButton({ done, onToggle, label }) {
   return (
@@ -33,6 +34,15 @@ export function TaskItem({ t, done, today, editing, showDate }) {
             {cat.label}
           </span>
           {overdue && <small className="carried">متأخرة من {formatShortDate(fromKey(t.date))}</small>}
+          {t.kind === 'once' && !t.done && !editing && t.date <= today && (
+            <button
+              className="mini"
+              onClick={() => db.tasks.update(t.id, { date: dateKey(addDays(fromKey(today), 1)) })}
+              aria-label={`أجّل ${t.title} لبكرة`}
+            >
+              بكرة ←
+            </button>
+          )}
           {showDate && !overdue && t.kind === 'once' && <small>{formatShortDate(fromKey(t.date))}</small>}
         </span>
       </span>

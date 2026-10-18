@@ -9,6 +9,8 @@ import { buildDay, currentPrayer, progressFor } from '../lib/day.js'
 import { groupTasks } from '../lib/tasks.js'
 import { CheckButton, TaskItem } from '../components/TaskParts.jsx'
 import {
+  addDays,
+  dateKey,
   formatDuration,
   formatGregorian,
   formatHijri,
@@ -23,9 +25,13 @@ import { isIOS, isStandalone } from '../lib/device.js'
 import { getDeviceLocation } from '../lib/prayer.js'
 
 export default function Today({ settings, aspects, onOpenTasks }) {
-  const now = useNow()
-  const day = logicalDate(now)
-  const today = todayKey(now)
+  const realNow = useNow()
+  const [offset, setOffset] = useState(0) // ٠ = النهارده، -١ = امبارح (لو نسيت تعلّم)
+  const isToday = offset === 0
+  const day = addDays(logicalDate(realNow), offset)
+  const today = isToday ? todayKey(realNow) : dateKey(day)
+  // لما بنبص على امبارح بنعتبر اليوم كله خلص
+  const now = isToday ? realNow : addDays(day, 1)
   const [tasbihFor, setTasbihFor] = useState(null)
   const [locMsg, setLocMsg] = useState(null)
 
@@ -40,10 +46,11 @@ export default function Today({ settings, aspects, onOpenTasks }) {
   const workTotal = g.daily.length + g.today.length
   const workDone = g.daily.filter((t) => checkedSet.has(`task:${t.id}`)).length + g.today.filter((t) => t.done).length
   const progress = progressFor(checkedSet, settings, workTotal, workDone)
-  const curPrayer = currentPrayer(times, now)
+  const curPrayer = isToday ? currentPrayer(times, now) : null
+  const excused = checkedSet.has('day:excused')
 
   // أول بند لسه ما اتعلّمش ووقته جاي
-  const next = rows.find((r) => !r.hideTime && r.time > now && !checkedSet.has(r.id))
+  const next = isToday && rows.find((r) => !r.hideTime && r.time > now && !checkedSet.has(r.id))
 
   const toggle = (item, done, value) => setCheck(today, item, done, value)
 
@@ -77,7 +84,18 @@ export default function Today({ settings, aspects, onOpenTasks }) {
         </p>
       </header>
 
-      {!isStandalone() && <InstallCard ios={isIOS()} />}
+      <div className="seg day-switch" role="radiogroup" aria-label="اليوم">
+        <button className={!isToday ? 'is-on' : ''} onClick={() => setOffset(-1)}>
+          امبارح
+        </button>
+        <button className={isToday ? 'is-on' : ''} onClick={() => setOffset(0)}>
+          النهارده
+        </button>
+      </div>
+
+      {!isToday && <p className="muted center">بتعلّم على يوم امبارح — لو نسيت حاجة علّمها هنا.</p>}
+
+      {isToday && !isStandalone() && <InstallCard ios={isIOS()} />}
 
       {!settings.location?.auto && (
         <button className="card card-action" onClick={locate}>
@@ -97,7 +115,7 @@ export default function Today({ settings, aspects, onOpenTasks }) {
             aspects={aspects}
             progress={progress.aspects}
             centerValue={`${num(Math.round(progress.overall * 100))}٪`}
-            centerLabel="النهارده"
+            centerLabel={isToday ? 'النهارده' : 'امبارح'}
           />
           <ul className="legend legend-col">
             {aspects.map((a) => (
@@ -130,8 +148,10 @@ export default function Today({ settings, aspects, onOpenTasks }) {
                 now={now}
                 isCurrent={curPrayer === r.prayer}
                 done={checkedSet.has(r.id)}
+                state={checked.get(r.id)?.value}
+                onState={(v) => toggle(r.id, true, v)}
                 tasbihDone={checkedSet.has(`tasbih:${r.prayer}`)}
-                onToggle={(d) => toggle(r.id, d)}
+                onToggle={(d) => toggle(r.id, d, 'ontime')}
                 onTasbih={() => setTasbihFor(r)}
                 onUndoTasbih={() => toggle(`tasbih:${r.prayer}`, false)}
               />
@@ -148,13 +168,33 @@ export default function Today({ settings, aspects, onOpenTasks }) {
               />
             )
           }
-          if (r.type === 'work')
+          if (r.type === 'work') {
+            if (!isToday) return null
             return (
               <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
             )
+          }
           return <CheckRow key={r.id} row={r} done={checkedSet.has(r.id)} onToggle={(d) => toggle(r.id, d)} />
         })}
       </ol>
+
+      <button
+        className={`card card-action excuse ${excused ? 'is-on' : ''}`}
+        onClick={() => toggle('day:excused', !excused)}
+        aria-pressed={excused}
+      >
+        <span className="card-icon">
+          <Icon name={excused ? 'check' : 'bed'} />
+        </span>
+        <span>
+          <strong>{excused ? (isToday ? 'النهارده يوم عذر' : 'امبارح كان يوم عذر') : 'يوم عذر؟ (سفر أو تعب)'}</strong>
+          <small>
+            {excused
+              ? 'العادات اللي فاتتك مش هتكسر السلسلة. الصلاة بتفضل زي ما هي. دوس تاني للإلغاء'
+              : 'علّمه عشان اللي يفوتك من العادات ما يكسرش السلسلة'}
+          </small>
+        </span>
+      </button>
 
       {tasbihFor && (
         <TasbihSheet
@@ -170,8 +210,16 @@ export default function Today({ settings, aspects, onOpenTasks }) {
   )
 }
 
-function PrayerRow({ row, now, isCurrent, done, tasbihDone, onToggle, onTasbih, onUndoTasbih }) {
+const PRAYER_STATES = [
+  ['ontime', 'في وقتها'],
+  ['mosque', 'في المسجد'],
+  ['late', 'متأخرة'],
+  ['qada', 'قضاء'],
+]
+
+function PrayerRow({ row, now, isCurrent, done, state, onState, tasbihDone, onToggle, onTasbih, onUndoTasbih }) {
   const upcoming = row.time > now
+  const st = state === true || !state ? 'ontime' : state
   return (
     <li className={`tl-item tl-prayer ${done ? 'is-done' : ''} ${isCurrent && !done ? 'is-now' : ''}`}>
       <span className="tl-time">{formatTime(row.time)}</span>
@@ -187,6 +235,15 @@ function PrayerRow({ row, now, isCurrent, done, tasbihDone, onToggle, onTasbih, 
           </div>
           <CheckButton done={done} onToggle={onToggle} label={`صليت ${row.title}`} />
         </div>
+        {done && (
+          <div className="state-row" role="radiogroup" aria-label={`صليت ${row.title} إزاي`}>
+            {PRAYER_STATES.map(([id, label]) => (
+              <button key={id} className={`mini ${st === id ? 'is-on' : ''} mini-${id}`} onClick={() => onState(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {(done || !upcoming) && (
           <button
             className={`chip ${tasbihDone ? 'chip-done' : ''}`}

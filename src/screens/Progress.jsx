@@ -22,11 +22,20 @@ export default function Progress({ settings }) {
     if (!checks || !tasks) return null
     const byDate = indexChecks(checks)
     const habits = habitDefs(settings, tasks).map((d) => habitStats(d, byDate, settings.firstUse))
-    return { habits, balance: balanceFor(habits, tasks, today) }
+    // إزاي صليت في آخر ٣٠ يوم
+    const from = dateKey(addDays(fromKey(today), -30))
+    const prayerMix = { ontime: 0, mosque: 0, late: 0, qada: 0 }
+    for (const c of checks) {
+      if (!c.item.startsWith('prayer:') || c.date < from) continue
+      const v = c.value === true || !c.value ? 'ontime' : c.value
+      prayerMix[v] = (prayerMix[v] || 0) + 1
+    }
+    return { habits, prayerMix, balance: balanceFor(habits, tasks, today) }
   }, [checks, tasks, settings, today])
 
   if (!data || !goals) return null
-  const { habits, balance } = data
+  const { habits, balance, prayerMix } = data
+  const prayerTotal = Object.values(prayerMix).reduce((a, b) => a + b, 0)
   const formed = habits.filter((h) => h.status === 'formed').length
   const bestNow = habits.reduce((m, h) => (h.current > m.current ? h : m), habits[0])
   const insights = buildInsights(habits, goals, balance)
@@ -110,6 +119,21 @@ export default function Progress({ settings }) {
         {visibleGroups.map(([group, list]) => (
           <div key={group} className="habit-group">
             <span className="tasks-label">{group}</span>
+            {group === 'الصلاة' && prayerTotal > 0 && (
+              <div className="prayer-mix">
+                {[
+                  ['mosque', 'في المسجد'],
+                  ['ontime', 'في وقتها'],
+                  ['late', 'متأخرة'],
+                  ['qada', 'قضاء'],
+                ].map(([k, label]) => (
+                  <span key={k} className={`mix mix-${k}`}>
+                    <strong>{num(prayerMix[k] || 0)}</strong>
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
             <ul className="habits">
               {list.map((h) => (
                 <HabitRow key={h.id} h={h} />
@@ -183,8 +207,12 @@ function balanceFor(habits, tasks, today) {
 // أهم ٤ حاجات ناقصاك دلوقتي
 function buildInsights(habits, goals, balance) {
   const out = []
+  // متفوتهاش مرتين ورا بعض
+  for (const h of habits.filter((h) => h.missedYesterdayOnly).slice(0, 2)) {
+    out.push({ kind: 'twice', title: h.name, text: 'فاتتك امبارح بس — النهارده متفوتهاش، عشان السلسلة ما تقعش' })
+  }
   const weak = habits
-    .filter((h) => h.window7 >= 3 && h.rate7 !== null && h.rate7 < 0.8)
+    .filter((h) => !h.missedYesterdayOnly && h.window7 >= 3 && h.rate7 !== null && h.rate7 < 0.8)
     .sort((a, b) => a.rate7 - b.rate7 || b.misses7 - a.misses7)
     .slice(0, 3)
   for (const h of weak) {

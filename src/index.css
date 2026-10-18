@@ -1603,3 +1603,101 @@ select.input {
   background: color-mix(in srgb, var(--warn) 13%, transparent);
   color: var(--warn);
 }
+
+/* ===== حالة الصلاة ويوم العذر ===== */
+
+.day-switch {
+  max-width: 260px;
+  align-self: center;
+  width: 100%;
+}
+
+.state-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mini {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mini.is-on {
+  color: var(--brand-ink);
+  background: var(--c-faith);
+  border-color: var(--c-faith);
+}
+
+.mini-late.is-on,
+.mini-qada.is-on {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #1c1406;
+}
+
+.task-meta .mini {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.excuse {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.excuse.is-on {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--gold) 50%, transparent);
+  background: color-mix(in srgb, var(--gold) 8%, var(--surface));
+}
+
+.prayer-mix {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+
+.mix {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 8px 4px;
+}
+
+.mix strong {
+  font-size: 18px;
+  color: var(--c-faith);
+}
+
+.mix-late strong,
+.mix-qada strong {
+  color: var(--gold);
+}
+
+/* ألوان هادية بدل الأحمر — من غير إحساس بالذنب */
+.insight-dot {
+  background: var(--gold);
+}
+
+.insight-twice .insight-dot {
+  background: var(--c-faith);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-faith) 18%, transparent);
+}
+
+.st-weak {
+  background: var(--surface-2);
+  color: var(--muted);
+}
