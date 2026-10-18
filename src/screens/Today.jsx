@@ -30,6 +30,7 @@ import Workout from './Workout.jsx'
 import { lessonTitle, todayPlan } from '../lib/hifz.js'
 import { backupDue, shareBackup } from '../lib/backup.js'
 import { postStage } from '../lib/plan.js'
+import { isSunnahFastDay, mealNames, tomorrowKey, waterPlan, waterStatus } from '../lib/water.js'
 
 // من الخطة: فيديو نازل النهارده أو بكرة، ومواعيد الدكاترة والتطعيمات
 function PlanToday({ today, onOpenSub }) {
@@ -111,6 +112,9 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
   const progress = progressFor(checkedSet, settings, workTotal, workDone, day)
   const curPrayer = isToday ? currentPrayer(times, now) : null
   const excused = checkedSet.has('day:excused')
+  const fasting = checkedSet.has('fast:yes')
+  const tomorrowK = tomorrowKey(day)
+  const tomorrowChecks = useLiveQuery(() => db.checks.where('date').equals(tomorrowK).toArray(), [tomorrowK])
 
   // أول بند لسه ما اتعلّمش ووقته جاي
   const next = isToday && rows.find((r) => !r.hideTime && r.time > now && !checkedSet.has(r.id))
@@ -218,6 +222,17 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
 
       {isToday && <PlanToday today={today} onOpenSub={onOpenSub} />}
 
+      <FastCard
+        day={day}
+        now={now}
+        isToday={isToday}
+        times={times}
+        today={today}
+        checkedSet={checkedSet}
+        tomorrowK={tomorrowK}
+        tomorrowSet={new Set((tomorrowChecks || []).map((c) => c.item))}
+      />
+
       <ol className="timeline">
         {rows.map((r) => {
           if (r.type === 'prayer')
@@ -261,7 +276,10 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
               <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
             )
           }
-          if (r.type === 'food') return <FoodBlock key={r.id} checkedSet={checkedSet} checked={checked} today={today} />
+          if (r.type === 'food')
+            return (
+              <FoodBlock key={r.id} checkedSet={checkedSet} checked={checked} today={today} day={day} now={now} settings={settings} fasting={fasting} />
+            )
           if (r.type === 'gym') {
             const done = checkedSet.has('gym')
             const label = r.routine.exercises.length ? `${num(r.routine.exercises.length)} تمارين + كارديو ${num(r.routine.cardio)} دقيقة` : `مشي ${num(r.routine.walk)} دقيقة`
@@ -425,8 +443,94 @@ function CheckRow({ row, done, onToggle, onOpen, openLabel }) {
   )
 }
 
-function FoodBlock({ checkedSet, checked, today }) {
+// الصيام: الاتنين والخميس بيسألك، ولو قررت تصوم المية والوجبات بتتغير
+async function setFast(date, yes) {
+  await setCheck(date, yes ? 'fast:yes' : 'fast:no', true)
+  await setCheck(date, yes ? 'fast:no' : 'fast:yes', false)
+}
+
+function FastCard({ day, now, isToday, times, today, checkedSet, tomorrowK, tomorrowSet }) {
+  const fasting = checkedSet.has('fast:yes')
+  const decidedToday = fasting || checkedSet.has('fast:no')
+  const tomorrow = addDays(day, 1)
+  const askToday = isToday && isSunnahFastDay(day) && !decidedToday && now < times.maghrib
+  const askTomorrow = isToday && isSunnahFastDay(tomorrow) && !tomorrowSet.has('fast:yes') && !tomorrowSet.has('fast:no') && now >= times.asr
+  const tomorrowYes = isToday && tomorrowSet.has('fast:yes')
+  const dayName = (d) => (d.getDay() === 1 ? 'الاتنين' : d.getDay() === 4 ? 'الخميس' : '')
+
+  if (fasting)
+    return (
+      <section className="card fast-card is-on">
+        <div className="row-between">
+          <span>
+            <strong>صايم النهارده 🤍</strong>
+            <small>
+              {now < times.maghrib
+                ? `الفطار ${formatTime(times.maghrib)}، باقي ${formatDuration(minutesBetween(now, times.maghrib))}`
+                : 'ذهب الظمأ وابتلّت العروق وثبت الأجر إن شاء الله — تقبّل الله'}
+            </small>
+          </span>
+          {now < times.maghrib && (
+            <button className="link-btn" onClick={() => window.confirm('فطرت النهارده؟') && setFast(today, false)}>
+              فطرت
+            </button>
+          )}
+        </div>
+        <p className="muted">المية والوجبات اتظبطت على الصيام: من المغرب للفجر.</p>
+      </section>
+    )
+  if (askToday)
+    return (
+      <section className="card fast-card">
+        <strong>النهارده {dayName(day)}: صايم؟</strong>
+        <small className="muted">لو صايم، المية والوجبات هيتقسموا من المغرب للفجر.</small>
+        <div className="row">
+          <button className="btn" onClick={() => setFast(today, true)}>
+            أيوه صايم
+          </button>
+          <button className="btn btn-ghost" onClick={() => setFast(today, false)}>
+            مش النهارده
+          </button>
+        </div>
+      </section>
+    )
+  if (askTomorrow)
+    return (
+      <section className="card fast-card">
+        <strong>بكرة {dayName(tomorrow)}: هتصوم؟</strong>
+        <small className="muted">لو آه، هفكّرك بالسحور وأقسّم المية من المغرب للفجر.</small>
+        <div className="row">
+          <button className="btn" onClick={() => setFast(tomorrowK, true)}>
+            هصوم إن شاء الله
+          </button>
+          <button className="btn btn-ghost" onClick={() => setFast(tomorrowK, false)}>
+            مش المرة دي
+          </button>
+        </div>
+      </section>
+    )
+  if (tomorrowYes)
+    return (
+      <section className="card fast-card is-on">
+        <div className="row-between">
+          <span>
+            <strong>نويت تصوم بكرة إن شاء الله</strong>
+            <small>هفكّرك بالسحور قبل الفجر بساعة. اشرب مية كويس الليلة.</small>
+          </span>
+          <button className="link-btn" onClick={() => setFast(tomorrowK, false)}>
+            إلغاء
+          </button>
+        </div>
+      </section>
+    )
+  return null
+}
+
+function FoodBlock({ checkedSet, checked, today, day, now, settings, fasting }) {
   const water = checked.get('water:count')?.value || 0
+  const names = mealNames(fasting)
+  const plan = useMemo(() => waterPlan(day, settings, fasting), [day, settings, fasting])
+  const ws = waterStatus(plan, water, now)
 
   async function addWater(delta) {
     const next = Math.max(0, Math.min(20, water + delta))
@@ -444,17 +548,17 @@ function FoodBlock({ checkedSet, checked, today }) {
           </span>
           <div className="tl-text">
             <strong>الأكل والمية</strong>
-            <small>نص الطبق خضار، ربعه بروتين، ربعه نشويات</small>
+            <small>{fasting ? 'يوم صيام: سحور متأخر، وفطار خفيف على مرحلتين' : 'نص الطبق خضار، ربعه بروتين، ربعه نشويات'}</small>
           </div>
         </div>
         <ul className="tasks">
           {MEALS.map((m) => (
             <li key={m.id} className={`task ${checkedSet.has(m.id) ? 'is-done' : ''}`}>
               <span className="task-title">
-                {m.name}
+                {names[m.id]}
                 <small className="muted">على الطبق المظبوط وفيه بروتين</small>
               </span>
-              <CheckButton done={checkedSet.has(m.id)} onToggle={(d) => setCheck(today, m.id, d)} label={m.name} />
+              <CheckButton done={checkedSet.has(m.id)} onToggle={(d) => setCheck(today, m.id, d)} label={names[m.id]} />
             </li>
           ))}
           <li className={`task ${checkedSet.has('clean') ? 'is-done' : ''}`}>
@@ -472,6 +576,20 @@ function FoodBlock({ checkedSet, checked, today }) {
             </span>
             <small className="muted">{num(((water * 250) / 1000).toFixed(2).replace(/\.?0+$/, ''))} لتر</small>
           </div>
+          <ul className="water-plan">
+            {plan.map((p, i) => {
+              const done = water >= p.sum
+              const late = !done && p.at <= now
+              return (
+                <li key={i} className={done ? 'is-done' : late ? 'is-late' : p === ws.next ? 'is-next' : ''}>
+                  <span className="wp-time">{formatTime(p.at)}</span>
+                  <span className="wp-label">{p.label}</span>
+                  <span className="wp-cups">{done ? '✓' : `${num(p.cups)} ${p.cups === 1 ? 'كوباية' : 'كوبايات'}`}</span>
+                </li>
+              )
+            })}
+          </ul>
+          {ws.behind > 0 && <small className="late">متأخر {num(ws.behind)} {ws.behind === 1 ? 'كوباية' : 'كوبايات'} عن التقسيمة</small>}
           <div className="water-cups" aria-hidden="true">
             {Array.from({ length: WATER_TARGET }, (_, i) => (
               <span key={i} className={`cup ${i < water ? 'on' : ''}`} />
@@ -487,6 +605,11 @@ function FoodBlock({ checkedSet, checked, today }) {
               </button>
             )}
           </div>
+          {!fasting && !checkedSet.has('fast:no') && !isSunnahFastDay(day) && (
+            <button className="link-btn" onClick={() => setFast(today, true)}>
+              صايم النهارده؟
+            </button>
+          )}
         </div>
       </div>
     </li>

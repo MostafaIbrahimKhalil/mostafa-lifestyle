@@ -1,6 +1,7 @@
 import { PRAYERS } from './prayer.js'
 import { gymWeekdays } from './workout.js'
 import { MEALS } from './day.js'
+import { FAST_DAYS, FAST_START } from './water.js'
 import { addDays, dateKey, fromKey, todayKey } from './dates.js'
 
 // العادة بتتحسب "اتكونت" بعد ٦٦ يوم متتالي
@@ -19,6 +20,8 @@ export function habitDefs(settings, tasks) {
     { id: 'adhkar:evening', name: 'أذكار المساء', aspect: 'faith', group: 'الأذكار' },
     { id: 'adhkar:sleep', name: 'أذكار النوم', aspect: 'faith', group: 'الأذكار' },
     { id: 'wird', name: 'الورد اليومي', aspect: 'faith', group: 'القرآن' },
+    // الصيام: بيتحسب الاتنين والخميس بس، من يوم ما الميزة اتضافت
+    { id: 'fast', name: 'صيام الاتنين والخميس', aspect: 'faith', group: 'الصيام', days: FAST_DAYS, start: FAST_START, needs: ['fast:yes'] },
   ]
   if (settings.hifzEnabled !== false) defs.push({ id: 'hifz', name: 'الحفظ', aspect: 'faith', group: 'القرآن' })
   defs.push(

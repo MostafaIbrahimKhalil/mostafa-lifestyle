@@ -7,6 +7,7 @@ import { DEFAULT_GYM_TIME, routineFor } from './workout.js'
 import { backupDue } from './backup.js'
 import { lessonTitle, todayPlan } from './hifz.js'
 import { obligationsFor } from './wallet.js'
+import { isSunnahFastDay, waterPlan } from './water.js'
 
 export const PUSH_URL = 'https://mostafa-push.ui-designer-mostafa-ibrahim.workers.dev'
 const MIN = 60 * 1000
@@ -20,6 +21,8 @@ export const NOTIFY_DEFAULTS = {
   wird: true,
   hifz: true,
   bills: true,
+  water: true, // مواعيد كوبايات المية
+  fast: true, // سؤال الصيام والسحور
   plan: true, // مواعيد الدكاترة والتطعيمات، وفيديو مش متجدول، ومهام الخطة المهمة
 }
 
@@ -164,6 +167,10 @@ export async function buildSchedule(settings, now = new Date()) {
         if (p.date === next) push(timeOnDay(day, '20:00'), `فيديو بكرة لسه ما اتجدولش`, `${p.title}: ${p.hook || ''}`, `post-${p.id}`, null, i)
         if (p.date === k) push(timeOnDay(day, '10:00'), `فيديو النهارده: ${p.title}`, 'لسه ما اتجدولش — انشره أو جدوله', `post-${p.id}-0`, null, i)
       }
+      // مهام ليها ساعة محددة (زي مشروع كلمات الألماني)
+      for (const x of tasks.filter((x) => x.kind === 'once' && !x.done && x.date === k && x.at)) {
+        push(new Date(timeOnDay(day, x.at).getTime() - 15 * MIN), 'بعد ربع ساعة', x.title, `task-${x.id}`, null, i)
+      }
       const important = tasks.filter((x) => x.kind === 'once' && !x.done && x.priority === 1 && x.date === k)
       if (important.length)
         push(
@@ -174,6 +181,38 @@ export async function buildSchedule(settings, now = new Date()) {
           null,
           i,
         )
+    }
+  }
+  // المية والصيام
+  if ((prefs.water || prefs.fast) && settings.foodEnabled !== false) {
+    const k0 = dateKey(today)
+    const k1 = dateKey(addDays(today, 1))
+    const items = await db.checks.where('date').anyOf(k0, k1).toArray()
+    const has = (k, item) => items.some((c) => c.date === k && c.item === item)
+    const count = items.find((c) => c.date === k0 && c.item === 'water:count')?.value || 0
+    for (let i = 0; i < 2; i++) {
+      const day = addDays(today, i)
+      const k = i ? k1 : k0
+      const fasting = has(k, 'fast:yes')
+      if (prefs.water) {
+        waterPlan(day, settings, fasting).forEach((p, j) => {
+          if (i === 0 && count >= p.sum) return
+          push(p.at, `اشرب ${p.cups.toLocaleString('ar-EG')} ${p.cups === 1 ? 'كوباية' : 'كوبايات'} مية`, p.label, `water-${k}-${j}`, null, i)
+        })
+      }
+      if (prefs.fast) {
+        const t = prayerTimesFor(day, settings.location || undefined)
+        if (fasting) {
+          push(new Date(t.fajr.getTime() - 60 * MIN), 'السحور', 'تسحّروا فإن في السحور بركة — واشرب ٣ كوبايات', `suhoor-${k}`, null, i)
+          push(t.maghrib, 'الفطار 🤍', 'ذهب الظمأ وابتلّت العروق وثبت الأجر إن شاء الله', `iftar-${k}`, null, i)
+        }
+        // بكرة اتنين أو خميس ولسه ما قررتش
+        const next = addDays(day, 1)
+        const nk = dateKey(next)
+        if (i === 0 && isSunnahFastDay(next) && !has(nk, 'fast:yes') && !has(nk, 'fast:no')) {
+          push(timeOnDay(day, '21:30'), `بكرة ${next.getDay() === 1 ? 'الاتنين' : 'الخميس'}: هتصوم؟`, 'افتح التطبيق وقرر، عشان المية والسحور يتظبطوا', `fast-ask-${nk}`, null, 0)
+        }
+      }
     }
   }
   // تذكير بالنسخة الاحتياطية الساعة ٩ بالليل لو مستحقة

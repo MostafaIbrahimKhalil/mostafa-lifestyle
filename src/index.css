@@ -2882,3 +2882,57 @@ details[open] > summary.bal-head::after {
 .reader-end {
   padding-bottom: 90px;
 }
+
+/* ===== الصيام والمية ===== */
+.fast-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-color: color-mix(in srgb, var(--c-faith) 35%, transparent);
+}
+.fast-card.is-on {
+  background: color-mix(in srgb, var(--c-faith) 8%, var(--surface));
+}
+.fast-card strong {
+  display: block;
+}
+.fast-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.fast-card p {
+  margin: 0;
+}
+.water-plan {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.water-plan li {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.water-plan .wp-time {
+  font-variant-numeric: tabular-nums;
+}
+.water-plan li.is-done {
+  color: var(--c-faith);
+  opacity: 0.75;
+}
+.water-plan li.is-late {
+  color: var(--c-health);
+}
+.water-plan li.is-next {
+  background: color-mix(in srgb, var(--c-family) 12%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
