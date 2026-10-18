@@ -8,6 +8,13 @@ export async function seedPlan() {
   await seedOnce('seededGermanWords', () =>
     db.tasks.bulkAdd(GERMAN_WORDS_TASKS.map((t) => ({ kind: 'once', done: false, active: true, createdAt: new Date().toISOString(), plan: 'german-words', ...t }))),
   )
+  await seedOnce('renamedGermanCards', () =>
+    db.tasks
+      .filter((t) => t.plan === 'german-words')
+      .modify((t) => {
+        t.title = 'كروت الألماني التعليمية: ساعة (٧–٨ بالليل)'
+      }),
+  )
   if (await getSetting('seededPlan2026', false)) return
   const now = new Date().toISOString()
   await db.transaction('rw', [db.tasks, db.goals, db.posts, db.appts, db.settings], async () => {
