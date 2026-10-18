@@ -2236,3 +2236,14 @@ select.input {
 .seg::-webkit-scrollbar {
   display: none;
 }
+
+.btn-big {
+  min-height: 54px;
+  font-size: 16px;
+}
+
+.backup-card.is-due,
+.backup-nudge {
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  background: color-mix(in srgb, var(--gold) 9%, var(--surface));
+}

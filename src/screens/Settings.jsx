@@ -1,15 +1,11 @@
 import { useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
-import { exportBackup, importBackup, setSetting } from '../db.js'
-import { dateKey, num } from '../lib/dates.js'
+import { importBackup, setSetting } from '../db.js'
+import { backupDue, shareBackup } from '../lib/backup.js'
+import { formatShortDate, num } from '../lib/dates.js'
 import { getDeviceLocation } from '../lib/prayer.js'
-import {
-  isIOS,
-  isStandalone,
-  notificationStatus,
-  requestNotifications,
-  sendTestNotification,
-} from '../lib/device.js'
+import { enablePush, notifyPrefs, sync } from '../lib/push.js'
+import { isIOS, isStandalone, notificationStatus } from '../lib/device.js'
 
 export default function Settings({ settings }) {
   const [draftName, setDraftName] = useState(settings.name)
@@ -43,40 +39,32 @@ export default function Settings({ settings }) {
     setLocBusy(false)
   }
 
+  const [pushBusy, setPushBusy] = useState(false)
+  const prefs = notifyPrefs(settings)
+
   async function enableAndTest() {
+    setPushBusy(true)
     try {
-      let status = notificationStatus()
-      if (status === 'default') status = await requestNotifications()
-      setNotif(status)
-      if (status === 'granted') {
-        await sendTestNotification()
-        flash('بعتنالك إشعار تجربة')
-      } else if (status === 'denied') {
-        flash('الإشعارات مقفولة. افتحها من إعدادات الآيفون ← الإشعارات ← مصطفى لايف', 'warn')
-      }
-    } catch {
-      flash('حصلت مشكلة في الإشعار، جرّب تاني', 'warn')
+      await enablePush(settings)
+      setNotif(notificationStatus())
+      flash('اتفعّلت ✓ هيوصلك إشعار تجربة من السيرفر دلوقتي')
+    } catch (err) {
+      setNotif(notificationStatus())
+      flash(err?.message || 'حصلت مشكلة في الإشعارات، جرّب تاني', 'warn')
     }
+    setPushBusy(false)
+  }
+
+  async function togglePref(key) {
+    const next = { ...prefs, [key]: !prefs[key] }
+    await setSetting('notify', next)
+    sync({ ...settings, notify: next }).catch(() => {})
   }
 
   async function doExport() {
     try {
-      const data = await exportBackup()
-      const json = JSON.stringify(data, null, 2)
-      const filename = `mostafa-lifestyle-backup-${dateKey()}.json`
-      const file = new File([json], filename, { type: 'application/json' })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'نسخة احتياطية — مصطفى لايف' })
-      } else {
-        const url = URL.createObjectURL(file)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        a.click()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-      }
-      await setSetting('lastBackup', new Date().toISOString())
-      flash('النسخة الاحتياطية جاهزة')
+      await shareBackup()
+      flash('النسخة الاحتياطية جاهزة ✓ احفظها في Files أو ابعتها لنفسك')
     } catch (err) {
       if (err?.name !== 'AbortError') flash('ما قدرناش نعمل النسخة، جرّب تاني', 'warn')
     }
@@ -120,6 +108,28 @@ export default function Settings({ settings }) {
       </header>
 
       {msg && <div className={`toast toast-${msg.kind}`}>{msg.text}</div>}
+
+      <section className={`card backup-card ${backupDue(settings) ? 'is-due' : ''}`}>
+        <div className="row-between">
+          <h2>النسخة الاحتياطية</h2>
+          <span className={`pill ${backupDue(settings) ? 'st-slipped' : 'pill-ok'}`}>
+            {settings.lastBackup ? `آخر نسخة ${formatShortDate(new Date(settings.lastBackup))}` : 'لسه ما اتعملتش'}
+          </span>
+        </div>
+        <p className="muted">
+          بياناتك محفوظة على موبايلك بس. اعمل نسخة كل أسبوع واحفظها في Files أو ابعتها لنفسك، عشان لو الموبايل اتغيّر
+          أو شلت الأيقونة ترجّعها.
+        </p>
+        <button className="btn btn-wide btn-big" onClick={doExport}>
+          <Icon name="download" size={22} />
+          اعمل نسخة احتياطية دلوقتي
+        </button>
+        <button className="btn btn-ghost btn-wide" onClick={() => fileRef.current?.click()}>
+          <Icon name="upload" size={20} />
+          رجّع من نسخة
+        </button>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={doImport} />
+      </section>
 
       <section className="card">
         <h2>اسمك</h2>
@@ -209,31 +219,29 @@ export default function Settings({ settings }) {
         {!standalone && isIOS() ? (
           <p className="muted">الإشعارات على الآيفون بتشتغل بس لما التطبيق يبقى متثبت على الشاشة الرئيسية.</p>
         ) : (
-          <button className="btn btn-wide" onClick={enableAndTest} disabled={notif === 'unsupported'}>
+          <button className="btn btn-wide" onClick={enableAndTest} disabled={notif === 'unsupported' || pushBusy}>
             <Icon name="bell" size={20} />
-            {notif === 'granted' ? 'ابعت إشعار تجربة' : 'شغّل الإشعارات وجرّبها'}
+            {pushBusy ? 'بنفعّل…' : notif === 'granted' && settings.pushEnabled ? 'ابعت إشعار تجربة' : 'شغّل الإشعارات'}
           </button>
         )}
+        {[
+          ['prayerBefore', 'قبل الصلاة بـ ١٠ دقايق'],
+          ['prayerAt', 'وقت الأذان'],
+          ['adhkar', 'أذكار الصباح والمساء والنوم'],
+          ['wird', 'الورد'],
+          ['teeth', 'أسنان الليل'],
+          ['gym', 'الجيم (قبلها بنص ساعة)'],
+        ].map(([key, label]) => (
+          <label key={key} className="field field-row">
+            <span>{label}</span>
+            <input type="checkbox" className="switch" checked={prefs[key]} onChange={() => togglePref(key)} />
+          </label>
+        ))}
+        <p className="muted">
+          افتح التطبيق مرة كل يوم عشان مواعيد بكرة توصل للسيرفر. اللي بتعلّم عليه بدري مش بيجيلك تذكيره.
+        </p>
       </section>
 
-      <section className="card">
-        <h2>النسخة الاحتياطية</h2>
-        <p className="muted">
-          بياناتك محفوظة على موبايلك بس. اعمل نسخة كل فترة واحفظها في Files أو ابعتها لنفسك، عشان لو الموبايل
-          اتغيّر أو شلت الأيقونة.
-        </p>
-        <div className="row">
-          <button className="btn" onClick={doExport}>
-            <Icon name="download" size={20} />
-            اعمل نسخة
-          </button>
-          <button className="btn btn-ghost" onClick={() => fileRef.current?.click()}>
-            <Icon name="upload" size={20} />
-            رجّع من نسخة
-          </button>
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={doImport} />
-        </div>
-      </section>
 
       <section className="card">
         <div className="row-between">

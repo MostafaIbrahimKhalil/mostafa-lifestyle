@@ -27,6 +27,7 @@ import { MEALS, WATER_TARGET } from '../lib/day.js'
 import QuranReader from './QuranReader.jsx'
 import AdhkarReader from './AdhkarReader.jsx'
 import Workout from './Workout.jsx'
+import { backupDue, shareBackup } from '../lib/backup.js'
 
 export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
   const realNow = useNow()
@@ -101,6 +102,21 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
       {!isToday && <p className="muted center">بتعلّم على يوم امبارح — لو نسيت حاجة علّمها هنا.</p>}
 
       {isToday && !isStandalone() && <InstallCard ios={isIOS()} />}
+
+      {isToday && backupDue(settings) && (
+        <button className="card card-action backup-nudge" onClick={() => shareBackup().catch(() => {})}>
+          <span className="card-icon">
+            <Icon name="download" />
+          </span>
+          <span>
+            <strong>اعمل نسخة احتياطية</strong>
+            <small>
+              {settings.lastBackup ? 'فات أسبوع من آخر نسخة.' : 'لسه ما عملتش ولا نسخة.'} دوس هنا واحفظها في Files — ثانية
+              واحدة
+            </small>
+          </span>
+        </button>
+      )}
 
       {!settings.location?.auto && (
         <button className="card card-action" onClick={locate}>

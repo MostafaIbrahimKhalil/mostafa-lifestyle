@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getSetting, requestPersistentStorage, seedDefaults, setSetting } from './db.js'
 import { ASPECTS } from './aspects.js'
 import { useSettings } from './hooks.js'
 import { todayKey } from './lib/dates.js'
+import { sync } from './lib/push.js'
 import Icon from './components/Icon.jsx'
 import Today from './screens/Today.jsx'
 import Tasks from './screens/Tasks.jsx'
@@ -28,6 +29,8 @@ export default function App() {
   const [tab, setTab] = useState('today')
   const [sub, setSub] = useState(null) // صفحة جوه "المزيد"
   const settings = useSettings()
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
 
   const {
     needRefresh: [needRefresh],
@@ -46,6 +49,23 @@ export default function App() {
       if (!(await getSetting('firstUse'))) await setSetting('firstUse', todayKey())
       await setSetting('lastOpened', new Date().toISOString())
     })()
+  }, [])
+
+  // نحدّث جدول الإشعارات عند السيرفر لما التطبيق يتفتح ولما يتقفل
+  const synced = useRef(false)
+  useEffect(() => {
+    if (settings && !synced.current) {
+      synced.current = true
+      sync(settings).catch(() => {})
+    }
+  }, [settings])
+  useEffect(() => {
+    const onVis = () => {
+      if (!settingsRef.current) return
+      if (document.visibilityState === 'hidden' || document.visibilityState === 'visible') sync(settingsRef.current).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
   function switchTab(id) {
