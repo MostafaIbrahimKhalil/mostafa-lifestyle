@@ -2547,3 +2547,288 @@ details[open] > summary.bal-head::after {
   width: 40px;
   flex-shrink: 0;
 }
+
+/* ===== التسميع بالصوت ===== */
+.recite-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.mic-btn {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--brand);
+  color: var(--brand-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+.mic-btn.is-on {
+  background: var(--c-health);
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+.mic-btn:disabled {
+  opacity: 0.4;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-health) 45%, transparent); }
+  50% { box-shadow: 0 0 0 16px transparent; }
+}
+.recite-heard {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--muted);
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.recite-score {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-inline-start: 4px solid var(--c-health);
+}
+.recite-score.good {
+  border-inline-start-color: var(--c-faith);
+}
+.recite-score strong {
+  font-size: 20px;
+}
+.recite-text .w-ok {
+  color: var(--c-faith);
+}
+.recite-text .w-miss {
+  color: var(--c-health);
+  text-decoration: underline wavy color-mix(in srgb, var(--c-health) 60%, transparent);
+  text-underline-offset: 6px;
+}
+.small {
+  font-size: 12px;
+}
+
+/* ===== صفحة الحفظ ===== */
+.hifz-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hifz-lesson.is-done {
+  border-color: color-mix(in srgb, var(--c-faith) 40%, transparent);
+}
+.hifz-text {
+  font-family: 'Amiri Quran', serif;
+  font-size: 26px;
+  line-height: 2.2;
+  margin: 0;
+  color: var(--text);
+}
+.hifz-basmala {
+  display: block;
+  text-align: center;
+  font-size: 0.85em;
+  margin-bottom: 4px;
+}
+.hidden-ayat {
+  border: 1.5px dashed var(--line);
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 14px;
+  padding: 22px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.hifz-steps {
+  margin: 0;
+  padding-inline-start: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hifz-steps li strong {
+  display: block;
+  font-size: 14px;
+}
+.hifz-steps li small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.rep-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rep-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.rep-btn:active {
+  transform: scale(0.98);
+}
+.rep-count {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--c-faith);
+  min-width: 44px;
+  text-align: center;
+}
+
+/* ===== خطتي وجدول النشر والمولود ===== */
+.week-now {
+  border-color: color-mix(in srgb, var(--c-goals) 45%, transparent);
+}
+.week-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+.week-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+  padding-top: 2px;
+}
+.week-grid dd {
+  margin: 0;
+}
+.plan-links {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.plan-links .card-action {
+  margin: 0;
+}
+.weeks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wk {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+}
+.wk p {
+  margin: 4px 0 0;
+  line-height: 1.6;
+}
+.wk.is-now {
+  border-color: var(--c-goals);
+  background: color-mix(in srgb, var(--c-goals) 7%, transparent);
+}
+.wk.is-past {
+  opacity: 0.55;
+}
+.wk-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 8px;
+  margin-inline-end: 6px;
+}
+.wk-tag.home {
+  color: var(--c-family);
+}
+.wk-tag.work {
+  color: var(--c-work);
+}
+.wk-tag.content {
+  color: var(--c-goals);
+}
+.posts {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.post {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+.post.is-today {
+  border-color: var(--c-goals);
+}
+.post.is-past {
+  opacity: 0.7;
+}
+.post-head {
+  gap: 10px;
+}
+.post-no {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.post-head .tl-text {
+  flex: 1;
+}
+.post-body p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.post-caption .mini {
+  margin-inline-start: 6px;
+}
+.post-steps {
+  margin: 0;
+}
+.post-steps button {
+  flex: 1;
+}
+.warn-card {
+  border-color: color-mix(in srgb, var(--c-health) 45%, transparent);
+  font-size: 14px;
+}
+.plan-today {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-color: color-mix(in srgb, var(--c-goals) 40%, transparent);
+}
+.plan-line {
+  gap: 10px;
+  padding: 6px 0;
+  color: var(--text);
+}
+.plan-line .tl-text {
+  flex: 1;
+}
+.done-list summary {
+  cursor: pointer;
+  margin: 8px 0;
+}

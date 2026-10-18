@@ -20,6 +20,7 @@ export const NOTIFY_DEFAULTS = {
   wird: true,
   hifz: true,
   bills: true,
+  plan: true, // مواعيد الدكاترة والتطعيمات، وفيديو مش متجدول، ومهام الخطة المهمة
 }
 
 export function notifyPrefs(settings) {
@@ -139,6 +140,40 @@ export async function buildSchedule(settings, now = new Date()) {
           )
         }
       }
+    }
+  }
+  // الخطة: مواعيد الدكاترة والتطعيمات، والفيديو اللي لسه ما اتجدولش، والمهام المهمة جدًا
+  if (prefs.plan) {
+    const t0 = dateKey(today)
+    const t1 = dateKey(addDays(today, 1))
+    const t2 = dateKey(addDays(today, 2))
+    const [appts, posts, tasks] = await Promise.all([
+      db.appts.where('date').between(t0, t2, true, true).toArray(),
+      db.posts.where('date').between(t0, t2, true, true).toArray(),
+      db.tasks.where('date').between(t0, t1, true, true).toArray(),
+    ])
+    for (let i = 0; i < 2; i++) {
+      const day = addDays(today, i)
+      const k = dateKey(day)
+      const next = dateKey(addDays(day, 1))
+      for (const a of appts.filter((x) => !x.done)) {
+        if (a.date === k) push(timeOnDay(day, '09:00'), `النهارده: ${a.title}`, a.place || 'من البيت والمولود', `appt-${a.id}-0`, null, i)
+        if (a.date === next) push(timeOnDay(day, '20:00'), `بكرة: ${a.title}`, a.place || 'جهّز نفسك', `appt-${a.id}-1`, null, i)
+      }
+      for (const p of posts.filter((x) => !x.scheduled && !x.published)) {
+        if (p.date === next) push(timeOnDay(day, '20:00'), `فيديو بكرة لسه ما اتجدولش`, `${p.title}: ${p.hook || ''}`, `post-${p.id}`, null, i)
+        if (p.date === k) push(timeOnDay(day, '10:00'), `فيديو النهارده: ${p.title}`, 'لسه ما اتجدولش — انشره أو جدوله', `post-${p.id}-0`, null, i)
+      }
+      const important = tasks.filter((x) => x.kind === 'once' && !x.done && x.priority === 1 && x.date === k)
+      if (important.length)
+        push(
+          timeOnDay(day, '08:30'),
+          important.length === 1 ? 'مهمة مهمة النهارده' : `${important.length.toLocaleString('ar-EG')} مهام مهمة النهارده`,
+          important.map((x) => x.title).join('، ').slice(0, 120),
+          `tasks-${k}`,
+          null,
+          i,
+        )
     }
   }
   // تذكير بالنسخة الاحتياطية الساعة ٩ بالليل لو مستحقة

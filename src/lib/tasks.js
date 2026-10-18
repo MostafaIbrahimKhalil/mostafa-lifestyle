@@ -16,7 +16,8 @@ export const catOf = (t) => t.category || 'work'
 
 // تقسيم المهام لليوم: النهارده، كل يوم، جاية
 export function groupTasks(all, today) {
-  const daily = all.filter((t) => t.kind === 'daily' && t.active !== false)
+  // مهمة كل يوم ممكن تبدأ من تاريخ معيّن (startDate)
+  const daily = all.filter((t) => t.kind === 'daily' && t.active !== false && (!t.startDate || t.startDate <= today))
   const once = all.filter((t) => t.kind === 'once')
   const todayList = once
     .filter((t) => (t.done ? t.doneDate === today : t.date <= today))

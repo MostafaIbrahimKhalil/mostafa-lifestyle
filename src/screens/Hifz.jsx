@@ -23,6 +23,8 @@ import {
   toggleSameDay,
 } from '../lib/hifz.js'
 import { loadJuz } from './QuranReader.jsx'
+import ReciteSheet from '../components/ReciteSheet.jsx'
+import { speechSupported } from '../lib/recite.js'
 
 const juzCache = new Map()
 function getJuz(j) {
@@ -30,13 +32,34 @@ function getJuz(j) {
   return juzCache.get(j)
 }
 
+function lessonRows(surah, from, to) {
+  const js = [...new Set([juzOf(surah, from), juzOf(surah, to)])]
+  return Promise.all(js.map(getJuz)).then((all) => all.flat().filter((r) => r.s === surah && r.a >= from && r.a <= to))
+}
+
+// زرار "سمّع بصوتك": بيفتح التسميع على الآيات دي
+function ReciteButton({ l, small, onResult }) {
+  const [rows, setRows] = useState(null)
+  if (!speechSupported()) return null
+  return (
+    <>
+      <button
+        className={`btn btn-ghost ${small ? 'btn-small' : ''}`}
+        onClick={() => lessonRows(l.surah, l.from, l.to).then(setRows).catch(() => {})}
+      >
+        <Icon name="mic" size={18} /> سمّع بصوتك
+      </button>
+      {rows && <ReciteSheet title={lessonTitle(l)} rows={rows} onClose={() => setRows(null)} onResult={onResult} />}
+    </>
+  )
+}
+
 function AyatText({ surah, from, to, hidden, onReveal }) {
   const [rows, setRows] = useState(null)
   useEffect(() => {
     let alive = true
-    const js = [...new Set([juzOf(surah, from), juzOf(surah, to)])]
-    Promise.all(js.map(getJuz))
-      .then((all) => alive && setRows(all.flat().filter((r) => r.s === surah && r.a >= from && r.a <= to)))
+    lessonRows(surah, from, to)
+      .then((r) => alive && setRows(r))
       .catch(() => alive && setRows([]))
     return () => {
       alive = false
@@ -143,6 +166,7 @@ export default function Hifz({ settings }) {
                   <span style={{ width: `${Math.min(1, (l.reps || 0) / 20) * 100}%` }} />
                 </span>
               </div>
+              <ReciteButton l={l} />
               <div className="row">
                 <button className="btn btn-ghost" onClick={() => setHide(!hide)}>
                   {hide ? 'اظهر النص' : 'خبّي النص وسمّع'}
@@ -164,6 +188,7 @@ export default function Hifz({ settings }) {
           {plan.mode === 'doneToday' && (
             <>
               <p className="muted">تسميع النهارده عشان الحفظ يثبت:</p>
+              <ReciteButton l={l} small />
               <ul className="tasks">
                 {SAME_DAY.map((s) => {
                   const done = (l.sameDay || []).includes(s.id)
@@ -199,6 +224,7 @@ export default function Hifz({ settings }) {
             مفيش جديد النهارده. سمّع اللي حفظته امبارح ٣ مرات متفرقة، واربطه باللي قبله، وصلّي بيه لو تقدر.
           </p>
           <AyatText surah={l.surah} from={l.from} to={l.to} hidden={hide} onReveal={() => setHide(false)} />
+          {plan.mode === 'steady' && <ReciteButton l={l} />}
           {plan.mode === 'steady' && (
             <div className="row">
               <button className="btn btn-ghost" onClick={() => setHide(!hide)}>
@@ -249,6 +275,7 @@ export default function Hifz({ settings }) {
                 </button>
               </div>
               {openReview === r.id && <AyatText surah={r.surah} from={r.from} to={r.to} />}
+              <ReciteButton l={r} small />
               <div className="row">
                 <button className="btn btn-small" onClick={() => review(r, true, today)}>
                   سمّعتها صح ✓

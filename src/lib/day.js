@@ -134,7 +134,7 @@ export function currentPrayer(times, now) {
 
 // مهام الشغل اللي تظهر في يوم معيّن
 export function tasksForDay(allTasks, dateKeyStr) {
-  const daily = allTasks.filter((t) => t.kind === 'daily' && t.active !== false)
+  const daily = allTasks.filter((t) => t.kind === 'daily' && t.active !== false && (!t.startDate || t.startDate <= dateKeyStr))
   const once = allTasks
     .filter((t) => t.kind === 'once')
     .filter((t) => (t.done ? t.doneDate === dateKeyStr : t.date <= dateKeyStr))

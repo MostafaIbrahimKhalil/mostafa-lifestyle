@@ -73,6 +73,15 @@ db.version(5).stores({
   debts: '++id',
 })
 
+db.version(6).stores({
+  // جدول النشر: { id, date, title, hook, cta, edit, caption, edited, scheduled, published }
+  posts: '++id, date',
+  // مواعيد الدكاترة والتطعيمات: { id, kind: 'doctor'|'vaccine', title, date, place, note, done }
+  appts: '++id, date',
+  // مشتريات المولود: { id, name, price, beforeBirth, bought }
+  babyItems: '++id',
+})
+
 // أهداف السنة المبدئية — بتتضاف مرة واحدة بس
 export async function seedDefaults() {
   const seeded = await getSetting('seededGoals', false)

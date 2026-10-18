@@ -1,6 +1,9 @@
 import Icon from '../components/Icon.jsx'
 
 const ITEMS = [
+  { id: 'plan', label: 'خطتي: أكتوبر ونوفمبر', sub: 'الضروري، والأسبوع ده، والأسابيع لحد ديسمبر', icon: 'flag' },
+  { id: 'posts', label: 'جدول النشر', sub: 'الفيديوهات بمواعيدها: اتعدّل، اتجدول، نزل', icon: 'calendar' },
+  { id: 'baby', label: 'البيت والمولود', sub: 'التطعيمات والدكاترة والمشتريات', icon: 'heart' },
   { id: 'work', label: 'شغلي وحساباتي', sub: 'الطلبات، اللي سلّمته، الفلوس وعند مين', icon: 'wallet' },
   { id: 'hifz', label: 'حفظ القرآن', sub: 'حفظ ٣ آيات، مواعيد التسميع والمراجعة', icon: 'book' },
   { id: 'tasbih', label: 'السبحة', sub: 'عدّاد تسبيح حر', icon: 'beads' },

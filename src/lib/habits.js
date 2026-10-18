@@ -34,13 +34,14 @@ export function habitDefs(settings, tasks) {
       { id: 'clean', name: 'من غير حاجات تزوّد', aspect: 'health', group: 'الأكل' },
     )
   }
-  for (const t of tasks.filter((t) => t.kind === 'daily' && t.active !== false)) {
+  const todayK = todayKey()
+  for (const t of tasks.filter((t) => t.kind === 'daily' && t.active !== false && (!t.startDate || t.startDate <= todayK))) {
     defs.push({
       id: `task:${t.id}`,
       name: t.title,
       aspect: 'work',
       group: 'مهام كل يوم',
-      start: t.createdAt ? dateKey(new Date(t.createdAt)) : null,
+      start: t.startDate || (t.createdAt ? dateKey(new Date(t.createdAt)) : null),
     })
   }
   return defs

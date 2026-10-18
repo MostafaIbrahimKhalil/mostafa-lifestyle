@@ -29,8 +29,54 @@ import AdhkarReader from './AdhkarReader.jsx'
 import Workout from './Workout.jsx'
 import { lessonTitle, todayPlan } from '../lib/hifz.js'
 import { backupDue, shareBackup } from '../lib/backup.js'
+import { postStage } from '../lib/plan.js'
 
-export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
+// من الخطة: فيديو نازل النهارده أو بكرة، ومواعيد الدكاترة والتطعيمات
+function PlanToday({ today, onOpenSub }) {
+  const tomorrow = dateKey(addDays(new Date(today + 'T12:00'), 1))
+  const data = useLiveQuery(async () => {
+    const [posts, appts] = await Promise.all([
+      db.posts.where('date').between(today, tomorrow, true, true).toArray(),
+      db.appts.where('date').belowOrEqual(tomorrow).toArray(),
+    ])
+    return { posts, appts: appts.filter((a) => !a.done) }
+  }, [today, tomorrow])
+  if (!data || (!data.posts.length && !data.appts.length)) return null
+  const when = (d) => (d === today ? 'النهارده' : d === tomorrow ? 'بكرة' : 'فات معاده')
+  return (
+    <section className="card plan-today">
+      {data.posts.map((p) => {
+        const st = postStage(p, today)
+        return (
+          <button key={`p${p.id}`} className="link-row plan-line" onClick={() => onOpenSub('posts')}>
+            <Icon name="calendar" size={18} />
+            <span className="tl-text">
+              <strong>
+                فيديو {when(p.date)}: {p.title}
+              </strong>
+              <small>{p.hook}</small>
+            </span>
+            <span className={`pill ${st.cls}`}>{st.label}</span>
+          </button>
+        )
+      })}
+      {data.appts.map((a) => (
+        <button key={`a${a.id}`} className="link-row plan-line" onClick={() => onOpenSub('baby')}>
+          <Icon name="heart" size={18} />
+          <span className="tl-text">
+            <strong>
+              {when(a.date)}: {a.title}
+            </strong>
+            {a.place && <small>{a.place}</small>}
+          </span>
+          <Icon name="chevronLeft" size={16} />
+        </button>
+      ))}
+    </section>
+  )
+}
+
+export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOpenSub }) {
   const realNow = useNow()
   const [offset, setOffset] = useState(0) // ٠ = النهارده، -١ = امبارح (لو نسيت تعلّم)
   const isToday = offset === 0
@@ -169,6 +215,8 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
           </p>
         )}
       </section>
+
+      {isToday && <PlanToday today={today} onOpenSub={onOpenSub} />}
 
       <ol className="timeline">
         {rows.map((r) => {

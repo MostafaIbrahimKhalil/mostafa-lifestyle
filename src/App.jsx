@@ -19,6 +19,10 @@ import Hifz from './screens/Hifz.jsx'
 import GymPlan from './screens/GymPlan.jsx'
 import Work from './screens/Work.jsx'
 import Wallet from './screens/Wallet.jsx'
+import Plan from './screens/Plan.jsx'
+import Posts from './screens/Posts.jsx'
+import Baby from './screens/Baby.jsx'
+import { seedPlan } from './lib/plan.js'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
@@ -31,6 +35,7 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState('today')
   const [sub, setSub] = useState(null) // صفحة جوه "المزيد"
+  const [subBack, setSubBack] = useState(null) // لو الصفحة اتفتحت من صفحة تانية
   const settings = useSettings()
   const settingsRef = useRef(settings)
   settingsRef.current = settings
@@ -60,6 +65,7 @@ export default function App() {
     requestPersistentStorage()
     seedDefaults()
     seedWallet()
+    seedPlan()
     ;(async () => {
       if (!(await getSetting('firstUse'))) await setSetting('firstUse', todayKey())
       await setSetting('lastOpened', new Date().toISOString())
@@ -95,9 +101,15 @@ export default function App() {
     window.scrollTo({ top: 0 })
   }
 
-  function openSub(id) {
+  function openSub(id, from = null) {
     setSub(id)
+    setSubBack(from)
     window.scrollTo({ top: 0 })
+  }
+
+  function openFromAnywhere(id) {
+    setTab('more')
+    openSub(id)
   }
 
   return (
@@ -118,6 +130,7 @@ export default function App() {
               aspects={ASPECTS}
               onOpenTasks={() => switchTab('tasks')}
               onOpenHifz={openHifz}
+              onOpenSub={openFromAnywhere}
             />}
           {tab === 'tasks' && <Tasks />}
           {tab === 'progress' && (
@@ -125,8 +138,8 @@ export default function App() {
           )}
           {tab === 'wallet' && <Wallet settings={settings} onOpenWork={() => (setTab('more'), setSub('work'))} />}
           {tab === 'more' && sub && (
-            <button className="back-btn" onClick={() => setSub(null)}>
-              <Icon name="chevronRight" size={18} /> المزيد
+            <button className="back-btn" onClick={() => (subBack ? openSub(subBack) : setSub(null))}>
+              <Icon name="chevronRight" size={18} /> {subBack === 'plan' ? 'خطتي' : 'المزيد'}
             </button>
           )}
           {tab === 'more' && !sub && <More onOpen={openSub} />}
@@ -137,6 +150,9 @@ export default function App() {
           {tab === 'more' && sub === 'gym' && <GymPlan settings={settings} />}
           {tab === 'more' && sub === 'work' && <Work />}
           {tab === 'more' && sub === 'tasbih' && <Tasbih settings={settings} />}
+          {tab === 'more' && sub === 'plan' && <Plan onOpen={(id) => openSub(id, 'plan')} />}
+          {tab === 'more' && sub === 'posts' && <Posts />}
+          {tab === 'more' && sub === 'baby' && <Baby />}
         </main>
       )}
 
