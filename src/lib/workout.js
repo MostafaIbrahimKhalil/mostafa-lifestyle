@@ -96,21 +96,34 @@ export const EXERCISES = {
 }
 
 export const ROUTINES = {
-  A: { name: 'حديد A', exercises: ['legpress', 'chestpress', 'latpulldown', 'shoulderpress', 'plank'], cardio: 20 },
-  B: { name: 'حديد B', exercises: ['goblet', 'seatedrow', 'inclinedb', 'legcurl', 'abcrunch'], cardio: 20 },
-  cardio: { name: 'كارديو', exercises: [], cardio: 40, walk: 60 },
+  A: { name: 'مقاومة A + إيروبك', exercises: ['legpress', 'chestpress', 'latpulldown', 'shoulderpress', 'plank'], cardio: 30 },
+  B: { name: 'مقاومة B + إيروبك', exercises: ['goblet', 'seatedrow', 'inclinedb', 'legcurl', 'abcrunch'], cardio: 30 },
+  cardio: { name: 'إيروبك', exercises: [], cardio: 45, walk: 60 },
   walk: { name: 'مشي', exercises: [], walk: 60 },
 }
 
 export const CARDIO_KINDS = [
-  ['walk', 'مشي'],
+  ['elliptical', 'إيروبك'],
   ['treadmill', 'مشاية بميل'],
-  ['elliptical', 'إيروبك (إليبتكال)'],
   ['bike', 'عجلة'],
+  ['walk', 'مشي'],
 ]
 
-// الجدول الافتراضي: كل يوم — حديد الحد والخميس، كارديو التلات، ومشي باقي الأيام
-export const DEFAULT_GYM_DAYS = { 6: 'walk', 0: 'A', 1: 'walk', 2: 'cardio', 3: 'walk', 4: 'B', 5: 'walk' }
+// مجموع الكارديو والمقاومة في فترة
+export function trainingTotals(workouts, from, to) {
+  const ws = workouts.filter((w) => w.date >= from && w.date <= to)
+  const cardio = ws.filter((w) => w.cardio?.done)
+  return {
+    sessions: ws.filter((w) => w.done || w.cardio?.done).length,
+    cardioMin: cardio.reduce((s, w) => s + (Number(w.cardio.minutes) || 0), 0),
+    kcal: cardio.reduce((s, w) => s + (Number(w.cardio.kcal) || 0), 0),
+    strength: ws.filter((w) => Object.values(w.sets || {}).some((sets) => sets.some((x) => x.done))).length,
+    maxLevel: Math.max(0, ...cardio.map((w) => Number(w.cardio.level) || 0)),
+  }
+}
+
+// الهدف تخسيس: إيروبك كل يوم، ومقاومة الحد والخميس عشان العضل يفضل والنازل يبقى دهون
+export const DEFAULT_GYM_DAYS = { 6: 'cardio', 0: 'A', 1: 'cardio', 2: 'cardio', 3: 'cardio', 4: 'B', 5: 'cardio' }
 export const DEFAULT_GYM_TIME = '17:00'
 
 // ميعاد الجيم: بعد العشا بنص ساعة (الافتراضي)، أو ساعة ثابتة لو قفلت "بعد العشا"

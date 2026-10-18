@@ -33,10 +33,14 @@ export default function Workout({ routine, today, onClose }) {
 
   const cardioTarget = routine.exercises.length ? routine.cardio : routine.walk
   const cardio = session.cardio || {
-    kind: routine.exercises.length ? 'treadmill' : 'walk',
-    minutes: cardioTarget,
+    kind: 'elliptical',
+    minutes: routine.cardio || cardioTarget,
+    kcal: '',
+    level: '',
     done: false,
   }
+  // آخر إيروبك اتعمل: عشان تقارن المقاومة والسعرات
+  const lastCardio = history.find((w) => w.cardio?.done)?.cardio
   const exDone = routine.exercises.filter((id) => (session.sets?.[id] || []).filter((s) => s.done).length >= EXERCISES[id].sets)
   const totalParts = routine.exercises.length + 1
   const doneParts = exDone.length + (cardio.done ? 1 : 0)
@@ -168,11 +172,10 @@ export default function Workout({ routine, today, onClose }) {
 
         <section className={`card ex ${cardio.done ? 'is-done' : ''}`}>
           <div className="tl-text">
-            <strong>{routine.exercises.length ? `كارديو ${num(routine.cardio)} دقيقة` : routine.name}</strong>
+            <strong>{routine.exercises.length ? `إيروبك ${num(routine.cardio)} دقيقة` : `${routine.name} ${num(routine.cardio || 45)} دقيقة`}</strong>
             <small>
-              {routine.exercises.length
-                ? 'بعد الحديد. بسرعة تقدر تتكلم فيها بس بصعوبة'
-                : `مشي ${num(routine.walk)} دقيقة، أو إيروبك ${num(routine.cardio || 40)} دقيقة`}
+              {routine.exercises.length ? 'بعد المقاومة. ' : ''}بسرعة تقدر تتكلم فيها بس بصعوبة.
+              {lastCardio ? ` آخر مرة: ${num(Number(lastCardio.minutes) || 0)} دقيقة${lastCardio.level ? `، مقاومة ${num(lastCardio.level)}` : ''}${lastCardio.kcal ? `، ${num(lastCardio.kcal)} سعر` : ''}` : ''}
             </small>
           </div>
           <div className="seg seg-small" role="radiogroup" aria-label="نوع الكارديو">
@@ -185,7 +188,7 @@ export default function Workout({ routine, today, onClose }) {
                     cardio: {
                       ...cardio,
                       kind: id,
-                      minutes: !routine.exercises.length && id !== 'walk' ? routine.cardio || 40 : cardio.minutes,
+                      minutes: id === 'walk' ? routine.walk || 60 : cardio.minutes,
                     },
                   })
                 }
@@ -207,6 +210,32 @@ export default function Workout({ routine, today, onClose }) {
               />
               <small>دقيقة</small>
             </label>
+            <label className="set-field">
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder="—"
+                value={cardio.kcal ?? ''}
+                onChange={(e) => saveSession({ cardio: { ...cardio, kcal: e.target.value } })}
+                aria-label="السعرات"
+              />
+              <small>سعر</small>
+            </label>
+            <label className="set-field">
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder="—"
+                value={cardio.level ?? ''}
+                onChange={(e) => saveSession({ cardio: { ...cardio, level: e.target.value } })}
+                aria-label="مستوى المقاومة"
+              />
+              <small>مقاومة</small>
+            </label>
             <button
               className={`check ${cardio.done ? 'is-done' : ''}`}
               onClick={() => saveSession({ cardio: { ...cardio, done: !cardio.done } })}
@@ -222,6 +251,7 @@ export default function Workout({ routine, today, onClose }) {
           <Icon name="check" size={20} />
           {doneParts >= totalParts ? 'خلّصت التمرين 💪' : 'خلّصت التمرين (حتى لو مش كله)'}
         </button>
+        <p className="muted center">السعرات اللي على الجهاز غالبًا أكتر من الحقيقة، فما تكافئش نفسك بأكل على أساسها.</p>
         <p className="muted center">أنا مش مدرب — لو حسيت بألم (مش تعب) وقّف التمرين ده.</p>
       </div>
     </div>

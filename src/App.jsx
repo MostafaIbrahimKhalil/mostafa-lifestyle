@@ -23,7 +23,7 @@ import Plan from './screens/Plan.jsx'
 import Posts from './screens/Posts.jsx'
 import Baby from './screens/Baby.jsx'
 import { seedPlan } from './lib/plan.js'
-import { gymEveryDay, onePrayerNotification } from './lib/reminders.js'
+import { gymEveryDay, gymForFatLoss, onePrayerNotification } from './lib/reminders.js'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
@@ -67,7 +67,7 @@ export default function App() {
     seedDefaults()
     seedWallet()
     seedPlan()
-    gymEveryDay()
+    gymEveryDay().then(gymForFatLoss)
     onePrayerNotification()
     ;(async () => {
       if (!(await getSetting('firstUse'))) await setSetting('firstUse', todayKey())

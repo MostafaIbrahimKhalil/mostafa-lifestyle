@@ -36,6 +36,7 @@ export function habitDefs(settings, tasks) {
     defs.push(
       { id: 'plate', name: 'الأكل على الطبق المظبوط', aspect: 'health', group: 'الأكل', needs: MEALS.map((m) => m.id) },
       { id: 'water', name: '٣ لتر مية', aspect: 'health', group: 'الأكل' },
+      { id: 'protein', name: 'بروتين في كل وجبة', aspect: 'health', group: 'الأكل', start: '2026-10-19', needs: MEALS.map((m) => `protein:${m.id}`) },
       { id: 'clean', name: 'من غير حاجات تزوّد', aspect: 'health', group: 'الأكل' },
     )
   }

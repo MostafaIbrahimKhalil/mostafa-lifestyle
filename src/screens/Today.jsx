@@ -781,6 +781,7 @@ function FoodBlock({ checkedSet, checked, today, day, now, settings, fasting }) 
           <div className="tl-text">
             <strong>الأكل والمية</strong>
             <small>{fasting ? 'يوم صيام: سحور متأخر، وفطار خفيف على مرحلتين' : 'نص الطبق خضار، ربعه بروتين، ربعه نشويات'}</small>
+            <small>البروتين: حوالي ١٠٠–١٣٠ جرام في اليوم — فراخ، لحمة، سمك، بيض، زبادي، جبنة قريش، فول، عدس</small>
           </div>
         </div>
         <ul className="tasks">
@@ -788,7 +789,14 @@ function FoodBlock({ checkedSet, checked, today, day, now, settings, fasting }) 
             <li key={m.id} className={`task ${checkedSet.has(m.id) ? 'is-done' : ''}`}>
               <span className="task-title">
                 {names[m.id]}
-                <small className="muted">على الطبق المظبوط وفيه بروتين</small>
+                <small className="muted">على الطبق المظبوط</small>
+                <button
+                  className={`chip protein-chip ${checkedSet.has(`protein:${m.id}`) ? 'chip-on' : ''}`}
+                  onClick={() => setCheck(today, `protein:${m.id}`, !checkedSet.has(`protein:${m.id}`))}
+                  aria-pressed={checkedSet.has(`protein:${m.id}`)}
+                >
+                  {checkedSet.has(`protein:${m.id}`) ? '✓ ' : ''}فيها بروتين
+                </button>
               </span>
               <CheckButton done={checkedSet.has(m.id)} onToggle={(d) => setCheck(today, m.id, d)} label={names[m.id]} />
             </li>

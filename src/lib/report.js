@@ -7,10 +7,14 @@ import { PLAN, lessonTitle, summary as hifzSummary } from './hifz.js'
 import { clientLedger, earnedItems } from './work.js'
 import { obligationsFor } from './wallet.js'
 import { WATER_TARGET } from './day.js'
+import { trainingTotals } from './workout.js'
+import { bodyTrend } from './body.js'
 
 const n = (x) => Math.round(x).toLocaleString('ar-EG')
 const pct = (a, b) => (b ? `${n((a / b) * 100)}٪` : '—')
 const egp = (x) => `${n(x)} ج`
+const d1 = (x) => (Math.round(Math.abs(x) * 10) / 10).toLocaleString('ar-EG')
+const sg = (x) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${d1(x)}`
 const short = (k) => new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short' }).format(fromKey(k))
 
 export function reportRange(kind, now = new Date()) {
@@ -26,7 +30,8 @@ export function reportRange(kind, now = new Date()) {
 
 export async function buildReport(kind, settings, now = new Date()) {
   const { from, to, title, mk } = reportRange(kind, now)
-  const [checks, tasks, hifz, body, txns, obligations, clients, jobs, payments, posts, goals, debts] = await Promise.all([
+  const [workouts, checks, tasks, hifz, body, txns, obligations, clients, jobs, payments, posts, goals, debts] = await Promise.all([
+    db.workouts.toArray(),
     db.checks.where('date').between(from, to, true, true).toArray(),
     db.tasks.toArray(),
     db.hifzLessons.toArray(),
@@ -70,6 +75,7 @@ export async function buildReport(kind, settings, now = new Date()) {
   const S = Object.fromEntries(stats.map((s) => [s.id, s]))
   const line = (id, label) => (S[id] && S[id].total ? `${label || S[id].name}: ${n(S[id].done)} من ${n(S[id].total)} (${pct(S[id].done, S[id].total)})` : null)
 
+  L.push('الهدف: تخسيس (نسبة الدهون)، مش بناء عضل.')
   // ===== العبادة =====
   L.push('', '【العبادة】')
   for (const p of PRAYERS) {
@@ -96,18 +102,20 @@ export async function buildReport(kind, settings, now = new Date()) {
 
   // ===== الصحة =====
   L.push('', '【الصحة】')
-  for (const [id, label] of [['gym', 'الجيم'], ['teeth:am'], ['teeth:pm'], ['nails', 'قص الضوافر'], ['plate', 'الأكل على الطبق المظبوط'], ['clean', 'من غير حاجات تزوّد'], ['water', `المية كاملة (${n(WATER_TARGET)} كوباية)`]]) {
+  for (const [id, label] of [['gym', 'الجيم'], ['teeth:am'], ['teeth:pm'], ['nails', 'قص الضوافر'], ['plate', 'الأكل على الطبق المظبوط'], ['protein'], ['clean', 'من غير حاجات تزوّد'], ['water', `المية كاملة (${n(WATER_TARGET)} كوباية)`]]) {
     const l = line(id, label)
     if (l) L.push(`- ${l}`)
   }
   const waterVals = days.map((d) => Number(checks.find((x) => x.item === 'water:count' && x.date === dateKey(d))?.value) || 0)
   if (days.length) L.push(`- متوسط المية: ${n(waterVals.reduce((s, v) => s + v, 0) / days.length)} كوباية في اليوم`)
-  const w = body.filter((b) => inRange(b.date))
-  const before = body.filter((b) => b.date < from).pop()
-  const firstW = before || w[0]
-  const lastW = w[w.length - 1]
-  if (lastW) L.push(`- الوزن: ${firstW && firstW !== lastW ? `من ${firstW.kg} لـ ${lastW.kg} (${lastW.kg - firstW.kg > 0 ? '+' : ''}${(Math.round((lastW.kg - firstW.kg) * 10) / 10).toLocaleString('ar-EG')} كيلو)` : `${lastW.kg} كيلو`}`)
+  const tr = trainingTotals(workouts, from, to)
+  L.push(`- التمرين: ${n(tr.sessions)} مرة، كارديو ${n(tr.cardioMin)} دقيقة${tr.kcal ? ` و${n(tr.kcal)} سعر على الجهاز` : ''}${tr.maxLevel ? `، أعلى مقاومة ${n(tr.maxLevel)}` : ''}، مقاومة (حديد) ${n(tr.strength)} مرة`)
+  const bt = bodyTrend(body.filter((b) => b.date <= to), to)
+  const kgIn = body.filter((b) => inRange(b.date) && b.kg)
+  if (bt.weekAvg) L.push(`- الوزن: متوسط آخر أسبوع ${(Math.round(bt.weekAvg * 10) / 10).toLocaleString('ar-EG')} كيلو${bt.prevWeekAvg ? ` (${sg(bt.weekAvg - bt.prevWeekAvg)} عن الأسبوع اللي قبله)` : ''}، اتوزنت ${n(kgIn.length)} مرة`)
   else L.push('- الوزن: ما اتسجلش')
+  if (bt.lastWaist) L.push(`- الوسط: ${bt.lastWaist.waist.toLocaleString('ar-EG')} سم${bt.waistChange ? ` (${sg(bt.waistChange)} من أول قياس)` : ''}`)
+  if (bt.lastInbody) L.push(`- InBody (${short(bt.lastInbody.date)}): دهون ${d1(bt.lastInbody.fat)}٪، عضل ${bt.lastInbody.muscle ? d1(bt.lastInbody.muscle) : '—'} كيلو، مية ${bt.lastInbody.water ? d1(bt.lastInbody.water) : '—'}٪${bt.inbodyChange ? ` (دهون ${sg(bt.inbodyChange.fat)}٪، عضل ${sg(bt.inbodyChange.muscle)} كيلو عن المرة اللي قبلها)` : ''}`)
 
   // ===== المهام والخطة =====
   L.push('', '【المهام والخطة】')

@@ -31,3 +31,14 @@ export async function onePrayerNotification() {
   await setSetting('notify', { ...notify, prayerBefore: false })
   await setSetting('onePrayerNotif', true)
 }
+
+// الهدف بقى تخسيس: أيام المشي بقت إيروبك (مرة واحدة)
+export async function gymForFatLoss() {
+  if (await getSetting('gymFatLoss', false)) return
+  const days = await getSetting('gymDays', null)
+  if (days) {
+    const next = Object.fromEntries(Object.entries(days).map(([d, r]) => [d, r === 'walk' ? 'cardio' : r]))
+    await setSetting('gymDays', next)
+  }
+  await setSetting('gymFatLoss', true)
+}

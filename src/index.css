@@ -3199,3 +3199,37 @@ details[open] > summary.bal-head::after {
 .zein-idea p {
   margin: 0 0 6px;
 }
+
+/* ===== الجسم والبروتين ===== */
+.protein-chip {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 12px;
+  padding: 3px 10px;
+}
+.body-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.body-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.body-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.body-row small {
+  font-size: 12.5px;
+}
+.inbody-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}

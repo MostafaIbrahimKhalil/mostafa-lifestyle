@@ -83,6 +83,8 @@ export async function buildSchedule(settings, now = new Date()) {
     }
     const sleep = timeOnDay(day, settings.sleepTime || DEFAULT_SLEEP)
     if (prefs.teeth) push(new Date(sleep.getTime() - 15 * MIN), 'غسيل الأسنان', 'قبل النوم 🦷', 'teeth-pm', 'teeth:pm', i)
+    if (prefs.gym && day.getDay() === 5) push(timeOnDay(day, '09:00'), 'قياس الأسبوع', 'اوزن نفسك وقيس وسطك قبل الفطار 📏', 'measure', null, i)
+    if (prefs.gym && day.getDay() === 5 && day.getDate() <= 7) push(timeOnDay(day, '09:05'), 'InBody الشهر', 'اعمل InBody في الجيم الأسبوع ده وسجّله في تقدّمي', 'inbody', null, i)
     if (prefs.teeth && day.getDay() === 4) push(timeOnDay(day, '21:00'), 'قص الضوافر', 'النهارده الخميس ✂️', 'nails', 'nails', i)
     if (prefs.adhkar) push(sleep, 'أذكار النوم', 'تصبح على خير', 'adhkar-sleep', 'adhkar:sleep', i)
     if (prefs.zein && settings.zeinEnabled !== false) {
