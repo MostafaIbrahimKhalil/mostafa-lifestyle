@@ -4,6 +4,7 @@ import Goals from '../components/Goals.jsx'
 import BodyWeight from '../components/BodyWeight.jsx'
 import BalanceReport from '../components/BalanceReport.jsx'
 import ReportCard from '../components/ReportCard.jsx'
+import QuranCard from '../components/QuranCard.jsx'
 import { lessonTitle, summary as hifzSummary, todayPlan } from '../lib/hifz.js'
 import { clientLedger, money, monthStats } from '../lib/work.js'
 import { monthKey } from '../lib/dates.js'
@@ -105,6 +106,8 @@ export default function Progress({ settings, onOpenHifz, onOpenWork }) {
       </section>
 
       <Goals goals={goals} />
+
+      <QuranCard settings={settings} />
 
       <button className="card card-action hifz-card" onClick={onOpenHifz}>
         <span className="card-icon">

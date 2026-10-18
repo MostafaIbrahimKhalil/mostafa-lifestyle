@@ -3233,3 +3233,53 @@ details[open] > summary.bal-head::after {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+/* ===== نسبة الورد ===== */
+.reader-progress {
+  height: 6px;
+}
+.wird-pct {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--c-faith);
+  background: color-mix(in srgb, var(--c-faith) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.is-on-voice {
+  color: var(--c-health);
+}
+
+/* ===== كارت الورد والختمة ===== */
+.quran-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stat-row.mini {
+  margin: 4px 0;
+}
+.stat-row.mini .stat strong {
+  font-size: 20px;
+}
+.q-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  direction: rtl;
+}
+.q-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c-faith) calc(var(--q) * 100%), var(--surface-2));
+}
+.q-cell.is-today {
+  outline: 2px solid var(--c-faith);
+  outline-offset: 1px;
+}
+.quran-card .stat-row {
+  background: none;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import '@fontsource/amiri-quran/arabic-400.css'
 import Icon from '../components/Icon.jsx'
-import { setCheck, setSetting } from '../db.js'
+import { db, setCheck, setSetting } from '../db.js'
 import { num } from '../lib/dates.js'
 import QURAN from '../data/quran-index.json'
 import { errorText, listen, makeFollower, normalize, speechSupported } from '../lib/recite.js'
@@ -9,6 +9,15 @@ import { errorText, listen, makeFollower, normalize, speechSupported } from '../
 const SURAH = Object.fromEntries(QURAN.surahs.map((s) => [s.n, s]))
 const BASMALA = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ'
 const FONT_SIZES = [22, 25, 28, 32, 36]
+
+// قيمة رقمية في علامات اليوم (بنقرا ونكتب في نفس العملية)
+async function bumpCheck(date, item, fn) {
+  await db.transaction('rw', db.checks, async () => {
+    const cur = (await db.checks.get(`${date}|${item}`))?.value || 0
+    const next = fn(Number(cur) || 0)
+    if (next !== cur) await db.checks.put({ id: `${date}|${item}`, date, item, value: next, at: new Date().toISOString() })
+  })
+}
 
 export function loadJuz(juz) {
   const n = String(juz).padStart(2, '0')
@@ -47,6 +56,20 @@ export default function QuranReader({ juz, today, settings, onClose }) {
     }
   }, [rows, pos])
 
+  // نسبة اللي اتقرا: بطول النص مش بعدد الآيات (الآيات مختلفة في الطول)
+  const cum = useMemo(() => {
+    if (!rows) return null
+    const total = rows.reduce((s, r) => s + r.t.length, 0)
+    let acc = 0
+    return rows.map((r) => {
+      const before = acc / total
+      acc += r.t.length
+      return before
+    })
+  }, [rows])
+  const cumRef = useRef(null)
+  cumRef.current = cum
+
   // بنتابع أول آية ظاهرة على الشاشة ونحفظها
   useEffect(() => {
     if (!rows || !scroller.current) return
@@ -59,9 +82,13 @@ export default function QuranReader({ juz, today, settings, onClose }) {
         const [s, a] = visible[0].target.dataset.k.split(':').map(Number)
         clearTimeout(timer)
         timer = setTimeout(() => {
-          const next = { juz, s, a, at: new Date().toISOString() }
+          const i = rows.findIndex((r) => r.s === s && r.a === a)
+          const pct = cumRef.current && i >= 0 ? Math.round(cumRef.current[i] * 100) : null
+          const next = { juz, s, a, pct, at: new Date().toISOString() }
           setPos(next)
           setSetting('wirdPos', next)
+          // أعلى نسبة وصلتلها النهارده (للرسمة والإحصائيات)
+          if (pct != null) bumpCheck(today, 'wird:pct', (cur) => Math.max(cur, pct))
         }, 600)
       },
       { root, rootMargin: '-90px 0px -70% 0px' },
@@ -71,14 +98,23 @@ export default function QuranReader({ juz, today, settings, onClose }) {
       io.disconnect()
       clearTimeout(timer)
     }
-  }, [rows, juz])
+  }, [rows, juz, today])
+
+  // وقت القراية: كل ٣٠ ثانية والصفحة قدامك بتتحسب
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') bumpCheck(today, 'quran:sec', (cur) => cur + 30)
+    }, 30000)
+    return () => clearInterval(t)
+  }, [today])
 
   const idx = useMemo(() => {
     if (!rows || !pos) return 0
     const i = rows.findIndex((r) => r.s === pos.s && r.a === pos.a)
     return i < 0 ? 0 : i
   }, [rows, pos])
-  const pct = rows ? Math.round(((idx + 1) / rows.length) * 100) : 0
+  const pct = rows && cum ? Math.round(cum[idx] * 100) : 0
+  const voiceOn = !!settings.quranVoice
 
   // ===== القراية بصوتك: النص باهت ٥٠٪ والكلمة اللي بتقراها بتنوّر =====
   // كل كلمة ليها رقم (data-w) — بنلوّن بالـ DOM مباشرة عشان الجزء فيه آلاف الكلمات
@@ -158,6 +194,9 @@ export default function QuranReader({ juz, today, settings, onClose }) {
 
   async function finish() {
     await setCheck(today, 'wird', true, juz)
+    await bumpCheck(today, 'wird:pct', () => 100)
+    // خلّصت الجزء ٣٠ = ختمة
+    if (juz === 30) await setSetting('khatmaCount', (settings.khatmaCount || 0) + 1)
     await setSetting('wirdNext', (juz % 30) + 1)
     await setSetting('wirdPos', null)
     onClose(true)
@@ -171,11 +210,23 @@ export default function QuranReader({ juz, today, settings, onClose }) {
         </button>
         <div className="reader-title">
           <strong>الجزء {num(juz)}</strong>
-          <small>
-            {rows ? `صفحة ${num(page || rows[0].p)}، قريت ${num(pct)}٪` : 'بيفتح…'}
-          </small>
+          <small>{rows ? `صفحة ${num(page || rows[0].p)}` : 'بيفتح…'}</small>
         </div>
+        {rows && <span className="wird-pct">{num(pct)}٪</span>}
         <div className="reader-font">
+          {speechSupported() && (
+            <button
+              className={`icon-btn ${voiceOn ? 'is-on-voice' : ''}`}
+              onClick={() => {
+                if (voiceOn) exitFollow()
+                setSetting('quranVoice', !voiceOn)
+              }}
+              aria-label={voiceOn ? 'اقفل القراية بالصوت' : 'القراية بالصوت'}
+              aria-pressed={voiceOn}
+            >
+              <Icon name="mic" size={18} />
+            </button>
+          )}
           <button
             className="icon-btn"
             onClick={() => setSetting('quranFont', Math.max(0, fontIdx - 1))}
@@ -211,7 +262,7 @@ export default function QuranReader({ juz, today, settings, onClose }) {
         )}
       </div>
 
-      {rows && speechSupported() && (
+      {rows && speechSupported() && voiceOn && (
         <div className={`follow-bar ${follow === 'on' ? 'is-on' : ''}`}>
           {followErr && <small className="late">{followErr}</small>}
           {follow === 'on' && <small>بسمعك… الكلمة اللي بتقراها بتنوّر</small>}

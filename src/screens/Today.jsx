@@ -277,7 +277,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
                 row={{
                   ...r,
                   title: `الورد: الجزء ${num(juz)}`,
-                  subtitle: c ? 'قريته ✓' : pos ? 'كمّل من مكان ما وقفت' : 'دوس عشان تقرا',
+                  subtitle: c ? 'قريته ✓' : pos ? `قريت ${num(pos.pct || 0)}٪ — كمّل من مكان ما وقفت` : 'دوس عشان تقرا',
                 }}
                 done={!!c}
                 onToggle={(d) => toggleWird(juz, d)}
