@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import BalanceRing from '../components/BalanceRing.jsx'
 import Icon from '../components/Icon.jsx'
@@ -158,17 +158,18 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
       </header>
 
       <div className="day-nav" aria-label="اتنقل بين الأيام">
-        <button className="icon-btn" onClick={() => setOffset(Math.max(-60, offset - 1))} aria-label="اليوم اللي قبله">
+        <button className="icon-btn" onClick={() => setOffset(Math.max(-400, offset - 1))} aria-label="اليوم اللي قبله">
           <Icon name="chevronRight" />
         </button>
         <button className={`day-nav-label ${isToday ? 'is-today' : ''}`} onClick={() => setOffset(0)}>
           <strong>{dayLabel}</strong>
           {!isToday && <small>{offset < -1 || offset > 1 ? DAY_LABEL[day.getDay()] : formatShortDate(day)} — دوس للنهارده</small>}
         </button>
-        <button className="icon-btn" onClick={() => setOffset(Math.min(120, offset + 1))} aria-label="اليوم اللي بعده">
+        <button className="icon-btn" onClick={() => setOffset(Math.min(400, offset + 1))} aria-label="اليوم اللي بعده">
           <Icon name="chevronLeft" />
         </button>
       </div>
+      <DayStrip day={day} base={logicalDate(realNow)} onPick={setOffset} />
 
       {offset < 0 && <p className="muted center">يوم فات — لو نسيت تعلّم حاجة علّمها هنا.</p>}
       {isFuture && <p className="muted center">يوم جاي: شوف عليك إيه، وضيف تذكير أو مهمة.</p>}
@@ -453,6 +454,55 @@ function CheckRow({ row, done, onToggle, onOpen, openLabel }) {
         </div>
       </div>
     </li>
+  )
+}
+
+// شريط أيام الشهر: ١، ٢، ٣… لحد آخر الشهر، والنقطة يعني فيه حاجة عليك اليوم ده
+const SHORT_DAY = { 6: 'سبت', 0: 'حد', 1: 'اتنين', 2: 'تلات', 3: 'أربع', 4: 'خميس', 5: 'جمعة' }
+function DayStrip({ day, base, onPick }) {
+  const ref = useRef(null)
+  const y = day.getFullYear()
+  const m = day.getMonth()
+  const count = new Date(y, m + 1, 0).getDate()
+  const from = dateKey(new Date(y, m, 1))
+  const to = dateKey(new Date(y, m, count))
+  const busy = useLiveQuery(async () => {
+    const [tasks, appts, posts, rems] = await Promise.all([
+      db.tasks.where('date').between(from, to, true, true).toArray(),
+      db.appts.where('date').between(from, to, true, true).toArray(),
+      db.posts.where('date').between(from, to, true, true).toArray(),
+      db.reminders.toArray(),
+    ])
+    const set = new Set([...tasks.filter((t) => !t.done).map((t) => t.date), ...appts.filter((a) => !a.done).map((a) => a.date), ...posts.map((p) => p.date)])
+    for (const r of rems) if (r.active !== false && r.date >= from && r.date <= to) set.add(r.date)
+    return { set, weekly: new Set(rems.filter((r) => r.active !== false && !r.date).map((r) => r.weekday)) }
+  }, [from, to])
+
+  useEffect(() => {
+    const el = ref.current?.querySelector('.is-sel')
+    if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [day])
+
+  const baseKey = dateKey(base)
+  const days = Array.from({ length: count }, (_, i) => new Date(y, m, i + 1))
+  return (
+    <div className="day-strip" ref={ref}>
+      {days.map((d) => {
+        const k = dateKey(d)
+        const has = busy && (busy.set.has(k) || busy.weekly.has(d.getDay()))
+        return (
+          <button
+            key={k}
+            className={`ds-day ${k === dateKey(day) ? 'is-sel' : ''} ${k === baseKey ? 'is-today' : ''} ${k < baseKey ? 'is-past' : ''} ${d.getDay() === 5 ? 'is-fri' : ''}`}
+            onClick={() => onPick(Math.round((new Date(y, m, d.getDate(), 12) - new Date(base.getFullYear(), base.getMonth(), base.getDate(), 12)) / 86400000))}
+          >
+            <small>{SHORT_DAY[d.getDay()]}</small>
+            <strong>{num(d.getDate())}</strong>
+            <span className={`ds-dot ${has ? 'on' : ''}`} />
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

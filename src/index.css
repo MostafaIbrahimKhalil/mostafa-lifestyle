@@ -2988,3 +2988,70 @@ details[open] > summary.bal-head::after {
   gap: 6px;
   padding: 6px 0;
 }
+
+/* ===== شريط أيام الشهر ===== */
+.day-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: -4px -16px 12px;
+  padding: 2px 16px 4px;
+  scroll-snap-type: x proximity;
+}
+.day-strip::-webkit-scrollbar {
+  display: none;
+}
+.ds-day {
+  flex: 0 0 44px;
+  scroll-snap-align: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 6px 0 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.ds-day small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.ds-day strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+.ds-day.is-past {
+  opacity: 0.55;
+}
+.ds-day.is-fri small {
+  color: var(--c-faith);
+}
+.ds-day.is-today {
+  border-color: var(--brand);
+}
+.ds-day.is-sel {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+  opacity: 1;
+}
+.ds-day.is-sel small {
+  color: var(--brand-ink);
+}
+.ds-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: transparent;
+}
+.ds-dot.on {
+  background: var(--c-health);
+}
+.ds-day.is-sel .ds-dot.on {
+  background: var(--brand-ink);
+}
