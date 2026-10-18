@@ -79,6 +79,7 @@ export async function buildSchedule(settings, now = new Date()) {
     }
     const sleep = timeOnDay(day, settings.sleepTime || DEFAULT_SLEEP)
     if (prefs.teeth) push(new Date(sleep.getTime() - 15 * MIN), 'غسيل الأسنان', 'قبل النوم 🦷', 'teeth-pm', 'teeth:pm', i)
+    if (prefs.teeth && day.getDay() === 4) push(timeOnDay(day, '21:00'), 'قص الضوافر', 'النهارده الخميس ✂️', 'nails', 'nails', i)
     if (prefs.adhkar) push(sleep, 'أذكار النوم', 'تصبح على خير', 'adhkar-sleep', 'adhkar:sleep', i)
     if (prefs.wird) {
       const slot = settings.wirdSlot || 'fajr'

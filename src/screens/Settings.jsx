@@ -234,7 +234,7 @@ export default function Settings({ settings }) {
           ['water', 'مواعيد المية'],
           ['fast', 'الصيام: السؤال والسحور والفطار'],
           ['plan', 'الخطة: المواعيد والفيديوهات والمهام المهمة'],
-          ['teeth', 'أسنان الليل'],
+          ['teeth', 'أسنان الليل وقص الضوافر يوم الخميس'],
           ['gym', 'الجيم (قبلها بنص ساعة)'],
         ].map(([key, label]) => (
           <label key={key} className="field field-row">

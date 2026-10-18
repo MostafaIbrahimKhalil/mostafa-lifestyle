@@ -20,11 +20,12 @@ export function trackedItemIds(settings, day = null) {
   if (settings.hifzEnabled !== false) ids.push('hifz')
   if (settings.foodEnabled !== false) ids.push(...MEALS.map((m) => m.id), 'water', 'clean')
   if (day && isGymDay(day, settings)) ids.push('gym')
+  if (day && day.getDay() === 4 && day >= new Date(2026, 9, 22)) ids.push('nails')
   return ids
 }
 
 export const ITEM_ASPECT = (item) => {
-  if (item.startsWith('teeth') || item.startsWith('meal') || item === 'water' || item === 'clean' || item === 'gym')
+  if (item.startsWith('teeth') || item.startsWith('meal') || item === 'water' || item === 'clean' || item === 'gym' || item === 'nails')
     return 'health'
   if (item.startsWith('task')) return 'work'
   return 'faith'
@@ -117,6 +118,10 @@ export function buildDay(day, settings) {
     icon: 'tooth',
     time: new Date(sleep.getTime() - 15 * MIN),
   })
+  // قص الضوافر كل خميس بالليل
+  if (day.getDay() === 4) {
+    rows.push({ type: 'check', id: 'nails', title: 'قص الضوافر', subtitle: 'كل خميس بالليل', icon: 'scissors', time: timeOnDay(day, '21:00') })
+  }
   rows.push({ type: 'check', id: 'adhkar:sleep', title: 'أذكار النوم', icon: 'bed', time: sleep })
 
   rows.sort((a, b) => a.time - b.time)
