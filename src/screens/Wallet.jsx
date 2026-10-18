@@ -1034,6 +1034,7 @@ function QuickAdd({ data, accounts, envelopes, mk, onForm }) {
   const [env, setEnv] = useState(null)
   const [done, setDone] = useState(null)
   const [listening, setListening] = useState(false)
+  const [help, setHelp] = useState(false)
   const stopRef = useRef(null)
 
   function parse(t = text) {
@@ -1156,20 +1157,16 @@ function QuickAdd({ data, accounts, envelopes, mk, onForm }) {
       </form>
       {done && <p className="qa-done">{done} ✓</p>}
       {!p && !done && !text && (
-        <div className="chip-wrap qa-examples">
-          {QUICK_EXAMPLES.slice(0, 4).map((x) => (
-            <button
-              key={x}
-              className="chip"
-              onClick={() => {
-                setText(x)
-                parse(x)
-              }}
-            >
-              {x}
-            </button>
+        <button className="link-btn qa-help" onClick={() => setHelp(!help)}>
+          {help ? 'خلاص' : 'أمثلة؟'}
+        </button>
+      )}
+      {help && !p && !text && (
+        <ul className="qa-examples-list">
+          {QUICK_EXAMPLES.map((x) => (
+            <li key={x}>{x}</li>
           ))}
-        </div>
+        </ul>
       )}
       {p && (
         <div className={`qa-preview ${p.type === 'unknown' ? 'is-bad' : ''}`}>

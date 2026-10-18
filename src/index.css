@@ -3283,3 +3283,15 @@ details[open] > summary.bal-head::after {
   padding: 0;
   box-shadow: none;
 }
+.qa-help {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 0;
+}
+.qa-examples-list {
+  margin: 0;
+  padding-inline-start: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.9;
+}
