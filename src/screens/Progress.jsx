@@ -13,7 +13,7 @@ import { db } from '../db.js'
 import { addDays, dateKey, fromKey, num, todayKey } from '../lib/dates.js'
 import { FORMED_DAYS, STATUS, habitDefs, habitStats, indexChecks } from '../lib/habits.js'
 
-const ASPECT_NAMES = { faith: 'العبادة', health: 'الصحة', work: 'المهام' }
+const ASPECT_NAMES = { faith: 'العبادة', health: 'الصحة', work: 'المهام', family: 'الأسرة' }
 const pct = (r) => (r === null || r === undefined ? '—' : `${num(Math.round(r * 100))}٪`)
 
 export default function Progress({ settings, onOpenHifz, onOpenWork }) {
@@ -221,7 +221,7 @@ function balanceFor(habits, tasks, today) {
     return due.length ? due.filter((t) => t.done).length / due.length : null
   }
   const out = {}
-  for (const a of ['faith', 'health']) {
+  for (const a of ['faith', 'health', 'family']) {
     const hs = habits.filter((h) => h.aspect === a)
     out[a] = { r7: avg(hs, 'rate7'), r30: avg(hs, 'rate30') }
   }
@@ -273,7 +273,7 @@ function buildInsights(habits, goals, balance) {
       out.push({ kind: 'goal', title: g.title, text: 'قسّمه لخطوات صغيرة' })
     }
   }
-  const aspects = ['faith', 'health', 'work'].filter((a) => balance[a].r7 !== null)
+  const aspects = ['faith', 'health', 'work', 'family'].filter((a) => balance[a].r7 !== null)
   if (aspects.length >= 2) {
     const low = aspects.reduce((m, a) => (balance[a].r7 < balance[m].r7 ? a : m), aspects[0])
     if (balance[low].r7 < 0.6) {

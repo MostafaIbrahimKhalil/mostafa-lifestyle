@@ -33,6 +33,7 @@ import Workout from './Workout.jsx'
 import { lessonTitle, todayPlan } from '../lib/hifz.js'
 import { backupDue, shareBackup } from '../lib/backup.js'
 import { postStage } from '../lib/plan.js'
+import { zeinIdea } from '../data/zein.js'
 import { isSunnahFastDay, mealNames, tomorrowKey, waterPlan, waterStatus } from '../lib/water.js'
 
 // من الخطة: فيديو نازل النهارده أو بكرة، ومواعيد الدكاترة والتطعيمات
@@ -321,6 +322,17 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
               />
             )
           }
+          if (r.type === 'zein')
+            return (
+              <ZeinRow
+                key={r.id}
+                row={r}
+                today={today}
+                settings={settings}
+                done={checkedSet.has('zein')}
+                onToggle={(d) => toggle('zein', d)}
+              />
+            )
           if (r.id === 'hifz')
             return (
               <CheckRow
@@ -626,6 +638,39 @@ function DayReminders({ dateK, weekday, label, settings }) {
         </button>
       )}
     </section>
+  )
+}
+
+// وقت زين: فكرة نشاط مختلفة كل يوم، و"فكرة تانية" لو مش مناسبة
+function ZeinRow({ row, today, settings, done, onToggle }) {
+  const pick = settings.zeinPick?.date === today ? settings.zeinPick.shift : 0
+  const idea = zeinIdea(today, pick)
+  const [open, setOpen] = useState(false)
+  return (
+    <li className={`tl-item ${done ? 'is-done' : ''}`}>
+      <span className="tl-time">{formatTime(row.time)}</span>
+      <div className="tl-body">
+        <div className="tl-main">
+          <span className="tl-icon tl-icon-family">
+            <Icon name="heart" size={18} />
+          </span>
+          <button className="tl-text link-row tl-open" onClick={() => setOpen(!open)}>
+            <strong>وقت زين</strong>
+            <small>النهارده: {idea.title}</small>
+          </button>
+          <CheckButton done={done} onToggle={onToggle} label="وقت زين" />
+        </div>
+        {open && (
+          <div className="zein-idea">
+            <p>{idea.how}</p>
+            <p className="muted">٢٠–٣٠ دقيقة، والموبايل بعيد.</p>
+            <button className="link-btn" onClick={() => setSetting('zeinPick', { date: today, shift: pick + 1 })}>
+              فكرة تانية ←
+            </button>
+          </div>
+        )}
+      </div>
+    </li>
   )
 }
 

@@ -8,6 +8,7 @@ const ASPECTS = [
   { id: 'faith', name: 'العبادة', color: 'var(--c-faith)' },
   { id: 'health', name: 'الصحة', color: 'var(--c-health)' },
   { id: 'work', name: 'المهام', color: 'var(--c-work)' },
+  { id: 'family', name: 'الأسرة', color: 'var(--c-family)' },
 ]
 const pct = (r) => (r === null || r === undefined ? '—' : `${num(Math.round(r * 100))}٪`)
 const rateOf = (h) => h.rate30 ?? h.rate7

@@ -21,6 +21,7 @@ export function trackedItemIds(settings, day = null) {
   if (settings.foodEnabled !== false) ids.push(...MEALS.map((m) => m.id), 'water', 'clean')
   if (day && isGymDay(day, settings)) ids.push('gym')
   if (day && day.getDay() === 4 && day >= new Date(2026, 9, 22)) ids.push('nails')
+  if (settings.zeinEnabled !== false && (!day || day >= new Date(2026, 9, 19))) ids.push('zein')
   return ids
 }
 
@@ -28,6 +29,7 @@ export const ITEM_ASPECT = (item) => {
   if (item.startsWith('teeth') || item.startsWith('meal') || item === 'water' || item === 'clean' || item === 'gym' || item === 'nails')
     return 'health'
   if (item.startsWith('task')) return 'work'
+  if (item === 'zein') return 'family'
   return 'faith'
 }
 
@@ -118,6 +120,10 @@ export function buildDay(day, settings) {
     icon: 'tooth',
     time: new Date(sleep.getTime() - 15 * MIN),
   })
+  // وقت زين: بعد المغرب بربع ساعة، وفكرة نشاط مختلفة كل يوم
+  if (settings.zeinEnabled !== false) {
+    rows.push({ type: 'zein', id: 'zein', title: 'وقت زين', icon: 'heart', time: new Date(times.maghrib.getTime() + 15 * MIN) })
+  }
   // قص الضوافر كل خميس بالليل
   if (day.getDay() === 4) {
     rows.push({ type: 'check', id: 'nails', title: 'قص الضوافر', subtitle: 'كل خميس بالليل', icon: 'scissors', time: timeOnDay(day, '21:00') })
@@ -151,6 +157,7 @@ export function progressFor(checkedSet, settings, workTotal, workDone, day = nul
   const ids = trackedItemIds(settings, day)
   const faith = ids.filter((i) => ITEM_ASPECT(i) === 'faith')
   const health = ids.filter((i) => ITEM_ASPECT(i) === 'health')
+  const family = ids.filter((i) => ITEM_ASPECT(i) === 'family')
   const ratio = (arr) => (arr.length ? arr.filter((i) => checkedSet.has(i)).length / arr.length : 0)
   const doneTracked = ids.filter((i) => checkedSet.has(i)).length
   const total = ids.length + workTotal
@@ -158,6 +165,7 @@ export function progressFor(checkedSet, settings, workTotal, workDone, day = nul
     aspects: {
       faith: ratio(faith),
       health: ratio(health),
+      family: ratio(family),
       work: workTotal ? workDone / workTotal : 0,
     },
     overall: total ? (doneTracked + workDone) / total : 0,

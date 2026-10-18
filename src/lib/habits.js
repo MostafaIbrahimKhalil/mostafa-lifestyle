@@ -28,6 +28,7 @@ export function habitDefs(settings, tasks) {
     { id: 'teeth:am', name: 'أسنان الصبح', aspect: 'health', group: 'الصحة' },
     { id: 'teeth:pm', name: 'أسنان قبل النوم', aspect: 'health', group: 'الصحة' },
     // الجيم بيتحسب في أيامه بس، وباقي الأيام مش بتكسر السلسلة
+    { id: 'zein', name: 'وقت زين', aspect: 'family', group: 'الأسرة', start: '2026-10-19' },
     { id: 'nails', name: 'قص الضوافر (كل خميس)', aspect: 'health', group: 'الصحة', days: [4], start: '2026-10-22' },
     { id: 'gym', name: 'الجيم', aspect: 'health', group: 'الصحة', days: gymWeekdays(settings) },
   )

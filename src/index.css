@@ -3182,3 +3182,20 @@ details[open] > summary.bal-head::after {
   resize: vertical;
   margin-bottom: 10px;
 }
+
+/* ===== وقت زين ===== */
+.tl-icon-family {
+  color: var(--c-family);
+  background: color-mix(in srgb, var(--c-family) 13%, transparent);
+}
+.zein-idea {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-family) 8%, var(--bg));
+  font-size: 14px;
+  line-height: 1.7;
+}
+.zein-idea p {
+  margin: 0 0 6px;
+}

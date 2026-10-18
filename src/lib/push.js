@@ -9,6 +9,7 @@ import { lessonTitle, todayPlan } from './hifz.js'
 import { obligationsFor } from './wallet.js'
 import { isSunnahFastDay, waterPlan } from './water.js'
 import { remindersFor } from './reminders.js'
+import { zeinIdea } from '../data/zein.js'
 
 export const PUSH_URL = 'https://mostafa-push.ui-designer-mostafa-ibrahim.workers.dev'
 const MIN = 60 * 1000
@@ -24,6 +25,7 @@ export const NOTIFY_DEFAULTS = {
   bills: true,
   water: true, // مواعيد كوبايات المية
   fast: true, // سؤال الصيام والسحور
+  zein: true, // وقت زين بعد المغرب
   report: true, // تقرير الأسبوع الخميس بالليل وتقرير الشهر أوله
   plan: true, // مواعيد الدكاترة والتطعيمات، وفيديو مش متجدول، ومهام الخطة المهمة
 }
@@ -83,6 +85,10 @@ export async function buildSchedule(settings, now = new Date()) {
     if (prefs.teeth) push(new Date(sleep.getTime() - 15 * MIN), 'غسيل الأسنان', 'قبل النوم 🦷', 'teeth-pm', 'teeth:pm', i)
     if (prefs.teeth && day.getDay() === 4) push(timeOnDay(day, '21:00'), 'قص الضوافر', 'النهارده الخميس ✂️', 'nails', 'nails', i)
     if (prefs.adhkar) push(sleep, 'أذكار النوم', 'تصبح على خير', 'adhkar-sleep', 'adhkar:sleep', i)
+    if (prefs.zein && settings.zeinEnabled !== false) {
+      const idea = zeinIdea(dateKey(day), settings.zeinPick?.date === dateKey(day) ? settings.zeinPick.shift : 0)
+      push(new Date(t.maghrib.getTime() + 15 * MIN), 'وقت زين 🤍', `النهارده: ${idea.title}`, 'zein', 'zein', i)
+    }
     const routine = routineFor(day, settings)
     if (prefs.gym && routine && !routine.optional) {
       const at = gymTimeFor(day, settings, t)
