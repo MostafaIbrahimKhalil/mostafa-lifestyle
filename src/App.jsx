@@ -16,6 +16,7 @@ import Tasbih from './screens/Tasbih.jsx'
 import Settings from './screens/Settings.jsx'
 import Hifz from './screens/Hifz.jsx'
 import GymPlan from './screens/GymPlan.jsx'
+import Work from './screens/Work.jsx'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
@@ -116,7 +117,9 @@ export default function App() {
               onOpenHifz={openHifz}
             />}
           {tab === 'tasks' && <Tasks />}
-          {tab === 'progress' && <Progress settings={settings} onOpenHifz={openHifz} />}
+          {tab === 'progress' && (
+            <Progress settings={settings} onOpenHifz={openHifz} onOpenWork={() => (setTab('more'), setSub('work'))} />
+          )}
           {tab === 'tasbih' && <Tasbih settings={settings} />}
           {tab === 'more' && sub && (
             <button className="back-btn" onClick={() => setSub(null)}>
@@ -129,6 +132,7 @@ export default function App() {
           {tab === 'more' && sub === 'settings' && <Settings settings={settings} />}
           {tab === 'more' && sub === 'hifz' && <Hifz />}
           {tab === 'more' && sub === 'gym' && <GymPlan settings={settings} />}
+          {tab === 'more' && sub === 'work' && <Work />}
         </main>
       )}
 

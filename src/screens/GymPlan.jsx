@@ -93,7 +93,7 @@ export default function GymPlan({ settings }) {
             {recent.map((w) => (
               <li key={w.id}>
                 <span>
-                  {formatShortDate(fromKey(w.date))} · {ROUTINES[w.routine]?.name || w.routine}
+                  {formatShortDate(fromKey(w.date))}، {ROUTINES[w.routine]?.name || w.routine}
                 </span>
                 <strong>{w.done ? '✓' : '…'}</strong>
               </li>

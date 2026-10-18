@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import Goals from '../components/Goals.jsx'
 import BodyWeight from '../components/BodyWeight.jsx'
 import { SURAH, hifzSummary, nextHifz } from '../lib/hifz.js'
+import { clientLedger, money, monthStats } from '../lib/work.js'
+import { monthKey } from '../lib/dates.js'
 import { daysLeft, goalProgress } from '../lib/goals.js'
 import Icon from '../components/Icon.jsx'
 import { db } from '../db.js'
@@ -13,12 +15,19 @@ const ASPECT_NAMES = { faith: 'العبادة', health: 'الصحة', work: 'ا�
 const ASPECT_COLORS = { faith: 'var(--c-faith)', health: 'var(--c-health)', work: 'var(--c-work)' }
 const pct = (r) => (r === null || r === undefined ? '—' : `${num(Math.round(r * 100))}٪`)
 
-export default function Progress({ settings, onOpenHifz }) {
+export default function Progress({ settings, onOpenHifz, onOpenWork }) {
   const today = todayKey()
   const checks = useLiveQuery(() => db.checks.toArray(), [])
   const tasks = useLiveQuery(() => db.tasks.toArray(), [])
   const goals = useLiveQuery(() => db.goals.orderBy('order').toArray(), [])
   const hifz = useLiveQuery(() => db.hifz.toArray(), [])
+  const workData = useLiveQuery(async () => {
+    const [clients, jobs, payments] = await Promise.all([db.clients.toArray(), db.jobs.toArray(), db.payments.toArray()])
+    if (!clients.length) return null
+    const ms = monthStats(monthKey(new Date()), clients, jobs, payments)
+    const owed = clients.reduce((s, c) => s + clientLedger(c, jobs, payments).owed, 0)
+    return { ms, owed }
+  }, [])
   const [showAll, setShowAll] = useState(false)
 
   const data = useMemo(() => {
@@ -102,8 +111,23 @@ export default function Progress({ settings, onOpenHifz }) {
           <strong>حفظ القرآن: {num((Math.round(hs.ratio * 1000) / 10).toFixed(1))}٪</strong>
           <small>
             {hifz.length
-              ? `${num(hs.memorized)} سورة حافظها${hn ? ` · كمّل ${SURAH[hn.surah].name}` : ''}`
+              ? `${num(hs.memorized)} سورة حافظها${hn ? `، كمّل ${SURAH[hn.surah].name}` : ''}`
               : 'سجّل السور اللي حافظها وبتحفظ فيها'}
+          </small>
+        </span>
+        <Icon name="chevronLeft" size={18} />
+      </button>
+
+      <button className="card card-action hifz-card" onClick={onOpenWork}>
+        <span className="card-icon">
+          <Icon name="wallet" />
+        </span>
+        <span>
+          <strong>شغلي الشهر ده: {workData ? money(workData.ms.earned) : '—'}</strong>
+          <small>
+            {workData
+              ? `${workData.ms.videos.toLocaleString('ar-EG')} فيديو، ليك برّه ${money(workData.owed)}`
+              : 'سجّل شغلك وفلوسك من هنا'}
           </small>
         </span>
         <Icon name="chevronLeft" size={18} />
@@ -121,7 +145,7 @@ export default function Progress({ settings, onOpenHifz }) {
                   <span className="swatch" style={{ background: ASPECT_COLORS[a] }} /> {ASPECT_NAMES[a]}
                 </span>
                 <span className="muted">
-                  ٧ أيام {pct(balance[a].r7)} · ٣٠ يوم {pct(balance[a].r30)}
+                  ٧ أيام {pct(balance[a].r7)}، ٣٠ يوم {pct(balance[a].r30)}
                 </span>
               </div>
               <span className="bar" style={{ '--bar': ASPECT_COLORS[a] }}>

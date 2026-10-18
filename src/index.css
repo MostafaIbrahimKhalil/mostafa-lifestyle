@@ -2247,3 +2247,143 @@ select.input {
   border-color: color-mix(in srgb, var(--gold) 60%, transparent);
   background: color-mix(in srgb, var(--gold) 9%, var(--surface));
 }
+
+/* ===== الشغل والحسابات ===== */
+
+.money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stat strong.money {
+  font-size: 17px;
+}
+
+.owed-card .big-pct {
+  color: var(--gold);
+  font-size: 22px;
+}
+
+.jobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.job {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.job:last-child {
+  border-bottom: 0;
+}
+
+.job.is-done .tl-text strong {
+  color: var(--muted);
+}
+
+.job .pill {
+  flex-shrink: 0;
+}
+
+.job-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.late {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.totals .link-row {
+  gap: 10px;
+  color: var(--text);
+}
+
+.income-bars {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  height: 160px;
+  align-items: end;
+}
+
+.ib {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ib.is-sel {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ib-track {
+  position: relative;
+  flex: 1;
+  width: 70%;
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.ib-earned,
+.ib-received {
+  position: absolute;
+  bottom: 0;
+  inset-inline: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.ib-earned {
+  background: color-mix(in srgb, var(--c-money) 35%, transparent);
+}
+
+.ib-received {
+  background: var(--c-money);
+  inset-inline: 22%;
+}
+
+.ib-goal {
+  position: absolute;
+  inset-inline: 0;
+  border-top: 2px dashed var(--ok);
+  z-index: 1;
+}
+
+.ib-val {
+  height: 14px;
+}
+
+.lg {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.lg-earned {
+  background: color-mix(in srgb, var(--c-money) 35%, transparent);
+}
+
+.lg-received {
+  background: var(--c-money);
+}

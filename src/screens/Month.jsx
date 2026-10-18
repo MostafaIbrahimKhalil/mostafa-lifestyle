@@ -89,7 +89,7 @@ export default function Month({ settings }) {
         {selKey && (
           <p className="muted">
             {new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }).format(fromKey(selKey))}
-            : {num(selChecks.filter((c) => c.item.startsWith('prayer')).length)} من ٥ صلوات ·{' '}
+            : {num(selChecks.filter((c) => c.item.startsWith('prayer')).length)} من ٥ صلوات،{' '}
             {num(selChecks.filter((c) => c.item.startsWith('teeth')).length)} من ٢ أسنان
           </p>
         )}

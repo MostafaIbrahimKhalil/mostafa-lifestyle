@@ -116,7 +116,7 @@ export default function Workout({ routine, today, onClose }) {
               )}
               <p className="ex-sug">
                 {last
-                  ? `آخر مرة: ${last.map((s) => (ex.noWeight ? num(s.r) : `${num(s.w)}×${num(s.r)}`)).join(' · ')} — ${sug.note}`
+                  ? `آخر مرة: ${last.map((s) => (ex.noWeight ? num(s.r) : `${num(s.w)}×${num(s.r)}`)).join('، ')} — ${sug.note}`
                   : sug.note}
               </p>
               <div className="sets">

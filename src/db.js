@@ -44,6 +44,16 @@ db.version(3)
       })
   })
 
+db.version(4).stores({
+  // العملاء: { id, name, kind: 'retainer'|'perVideo'|'perJob', rate, dueDay (0 = آخر الشهر), note, startMonth, active, order }
+  clients: '++id, active',
+  // الطلبات: { id, clientId, kind, title, qty, delivered, deliveries: [{date, n}], unitPrice, total,
+  //   month ('YYYY-MM' للباقة), receivedDate, deadline, cancelled, createdAt }
+  jobs: '++id, clientId, month',
+  // الدفعات: { id, clientId, amount, date, jobId (اختياري), note }
+  payments: '++id, clientId, date',
+})
+
 // أهداف السنة المبدئية — بتتضاف مرة واحدة بس
 export async function seedDefaults() {
   const seeded = await getSetting('seededGoals', false)

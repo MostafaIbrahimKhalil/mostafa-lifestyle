@@ -96,7 +96,7 @@ export default function QuranReader({ juz, today, settings, onClose }) {
         <div className="reader-title">
           <strong>الجزء {num(juz)}</strong>
           <small>
-            {rows ? `صفحة ${num(page || rows[0].p)} · قريت ${num(pct)}٪` : 'بيفتح…'}
+            {rows ? `صفحة ${num(page || rows[0].p)}، قريت ${num(pct)}٪` : 'بيفتح…'}
           </small>
         </div>
         <div className="reader-font">
@@ -170,7 +170,7 @@ function JuzText({ rows }) {
             <div key={`h${g.s}`} className="surah-head">
               <span className="surah-name">سورة {sm.name}</span>
               <small>
-                {sm.type} · {num(sm.ayahs)} آية
+                {sm.type}، {num(sm.ayahs)} آية
               </small>
             </div>
           )

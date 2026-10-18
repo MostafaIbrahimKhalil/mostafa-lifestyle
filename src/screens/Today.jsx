@@ -85,7 +85,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
         <h1>{settings.name}</h1>
         <p className="dates">
           <span>{formatGregorian(day)}</span>
-          <span className="dot" aria-hidden="true">·</span>
+          <span className="dot" aria-hidden="true">|</span>
           <span>{formatHijri(day)}</span>
         </p>
       </header>
@@ -153,7 +153,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
         {next && (
           <p className="next-up">
             <span className="next-dot" />
-            اللي جاي: <strong>{next.title}</strong> {formatTime(next.time)} · باقي{' '}
+            اللي جاي: <strong>{next.title}</strong> {formatTime(next.time)}، باقي{' '}
             {formatDuration(minutesBetween(now, next.time))}
           </p>
         )}
@@ -209,7 +209,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
             return (
               <CheckRow
                 key={r.id}
-                row={{ ...r, subtitle: r.routine.optional ? `${label} · اختياري` : label }}
+                row={{ ...r, subtitle: r.routine.optional ? `${label}، اختياري` : label }}
                 done={done}
                 onToggle={(d) => toggle('gym', d, r.routine.id)}
                 onOpen={() => setOverlay({ kind: 'gym', routine: r.routine })}

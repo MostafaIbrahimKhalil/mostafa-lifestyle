@@ -51,7 +51,7 @@ export default function Tasks() {
         </div>
         <p className="muted">
           النهارده: {num(doneCount)} من {num(total)}
-          {pending.some((t) => t.date < today) && ` · فيه ${num(pending.filter((t) => t.date < today).length)} متأخرة`}
+          {pending.some((t) => t.date < today) && `، فيه ${num(pending.filter((t) => t.date < today).length)} متأخرة`}
         </p>
         {total > 0 && (
           <span className="bar bar-work">

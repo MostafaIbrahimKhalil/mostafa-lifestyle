@@ -96,7 +96,7 @@ function GoalItem({ g, open, onToggle, isFirst }) {
   let sub
   if (status === 'done') sub = 'اتحقق ✓'
   else if (status === 'paused') sub = 'بدأته وسبته'
-  else if (g.targetDate) sub = `${formatShortDate(fromKey(g.targetDate))} · ${left >= 0 ? `باقي ${num(left)} يوم` : 'المعاد عدّى'}`
+  else if (g.targetDate) sub = `${formatShortDate(fromKey(g.targetDate))}، ${left >= 0 ? `باقي ${num(left)} يوم` : 'المعاد عدّى'}`
   else sub = 'لسه ما حددتش معاد'
 
   return (
@@ -118,7 +118,7 @@ function GoalItem({ g, open, onToggle, isFirst }) {
       {!open && steps.length > 0 && (
         <small className="muted goal-steps-sum">
           {num(doneSteps)} من {num(steps.length)} خطوات
-          {status !== 'done' && steps.find((s) => !s.done) && ` · الجاية: ${steps.find((s) => !s.done).title}`}
+          {status !== 'done' && steps.find((s) => !s.done) && `، الجاية: ${steps.find((s) => !s.done).title}`}
         </small>
       )}
       {open && (
