@@ -21,6 +21,15 @@ export async function seedPlan() {
     const order = (await db.goals.count()) + 1
     await db.goals.add({ ...BLENDER_GOAL, steps: stepsOf(BLENDER_GOAL.steps), done: false, status: 'active', order })
   })
+  // البليندر اتنقل بعد مشي الجيم عشان ما يخبطش فيه
+  await seedOnce('blenderAfterGym', () =>
+    db.tasks
+      .filter((t) => t.plan === 'blender-home')
+      .modify((t) => {
+        t.at = BLENDER_TASKS[0].at
+        t.title = BLENDER_TASKS[0].title
+      }),
+  )
   if (await getSetting('seededPlan2026', false)) return
   const now = new Date().toISOString()
   await db.transaction('rw', [db.tasks, db.goals, db.posts, db.appts, db.settings], async () => {
