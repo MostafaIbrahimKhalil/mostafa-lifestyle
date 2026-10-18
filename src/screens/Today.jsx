@@ -5,7 +5,9 @@ import Icon from '../components/Icon.jsx'
 import TasbihSheet from '../components/TasbihSheet.jsx'
 import { db, setCheck, setSetting } from '../db.js'
 import { useNow } from '../hooks.js'
-import { buildDay, currentPrayer, progressFor, tasksForDay } from '../lib/day.js'
+import { buildDay, currentPrayer, progressFor } from '../lib/day.js'
+import { groupTasks } from '../lib/tasks.js'
+import { CheckButton, TaskItem } from '../components/TaskParts.jsx'
 import {
   formatDuration,
   formatGregorian,
@@ -20,13 +22,7 @@ import {
 import { isIOS, isStandalone } from '../lib/device.js'
 import { getDeviceLocation } from '../lib/prayer.js'
 
-const PRIORITY = {
-  1: { label: 'مهم جدًا', cls: 'p1' },
-  2: { label: 'مهم', cls: 'p2' },
-  3: { label: 'عادي', cls: 'p3' },
-}
-
-export default function Today({ settings, aspects }) {
+export default function Today({ settings, aspects, onOpenTasks }) {
   const now = useNow()
   const day = logicalDate(now)
   const today = todayKey(now)
@@ -39,10 +35,10 @@ export default function Today({ settings, aspects }) {
   const { rows, times } = buildDay(day, settings)
   const checked = useMemo(() => new Map((checks || []).map((c) => [c.item, c])), [checks])
   const checkedSet = useMemo(() => new Set(checked.keys()), [checked])
-  const { daily, once } = useMemo(() => tasksForDay(allTasks || [], today), [allTasks, today])
+  const g = useMemo(() => groupTasks(allTasks || [], today), [allTasks, today])
 
-  const workTotal = daily.length + once.length
-  const workDone = daily.filter((t) => checkedSet.has(`task:${t.id}`)).length + once.filter((t) => t.done).length
+  const workTotal = g.daily.length + g.today.length
+  const workDone = g.daily.filter((t) => checkedSet.has(`task:${t.id}`)).length + g.today.filter((t) => t.done).length
   const progress = progressFor(checkedSet, settings, workTotal, workDone)
   const curPrayer = currentPrayer(times, now)
 
@@ -153,7 +149,9 @@ export default function Today({ settings, aspects }) {
             )
           }
           if (r.type === 'work')
-            return <WorkBlock key={r.id} daily={daily} once={once} checkedSet={checkedSet} today={today} />
+            return (
+              <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
+            )
           return <CheckRow key={r.id} row={r} done={checkedSet.has(r.id)} onToggle={(d) => toggle(r.id, d)} />
         })}
       </ol>
@@ -169,19 +167,6 @@ export default function Today({ settings, aspects }) {
         />
       )}
     </>
-  )
-}
-
-function CheckButton({ done, onToggle, label }) {
-  return (
-    <button
-      className={`check ${done ? 'is-done' : ''}`}
-      onClick={() => onToggle(!done)}
-      aria-pressed={done}
-      aria-label={label}
-    >
-      <Icon name="check" size={18} stroke={2.6} />
-    </button>
   )
 }
 
@@ -237,155 +222,41 @@ function CheckRow({ row, done, onToggle }) {
   )
 }
 
-function WorkBlock({ daily, once, checkedSet, today }) {
-  const [title, setTitle] = useState('')
-  const [kind, setKind] = useState('once')
-  const [priority, setPriority] = useState(2)
-  const [editing, setEditing] = useState(false)
-  const [adding, setAdding] = useState(false)
-
-  async function add(e) {
-    e.preventDefault()
-    const clean = title.trim()
-    if (!clean) return
-    await db.tasks.add({
-      kind,
-      title: clean,
-      priority: kind === 'once' ? priority : 2,
-      date: today,
-      done: false,
-      active: true,
-      createdAt: new Date().toISOString(),
-    })
-    setTitle('')
-  }
-
-  async function toggleOnce(t, done) {
-    await db.tasks.update(t.id, { done, doneDate: done ? today : null, doneAt: done ? new Date().toISOString() : null })
-  }
-
-  async function remove(t) {
-    if (t.kind === 'daily') {
-      if (!window.confirm(`تشيل "${t.title}" من مهام كل يوم؟`)) return
-      await db.tasks.update(t.id, { active: false })
-    } else {
-      await db.tasks.delete(t.id)
-    }
-  }
-
-  const total = daily.length + once.length
-  const doneCount = daily.filter((t) => checkedSet.has(`task:${t.id}`)).length + once.filter((t) => t.done).length
+function TasksBlock({ g, checkedSet, today, total, done, onOpen }) {
+  // أهم ٤ حاجات لسه ما خلصتش: المتأخرة والمهمة الأول، وبعدين الثابتة
+  const pending = [
+    ...g.today.filter((t) => !t.done),
+    ...g.daily.filter((t) => !checkedSet.has(`task:${t.id}`)),
+  ].slice(0, 4)
+  const more = total - done - pending.length
 
   return (
     <li className="tl-item tl-work">
       <span className="tl-time" />
       <div className="tl-body card-inner">
-        <div className="row-between">
+        <button className="row-between link-row" onClick={onOpen}>
           <div className="tl-main">
             <span className="tl-icon tl-icon-work">
               <Icon name="briefcase" size={18} />
             </span>
             <div className="tl-text">
-              <strong>الشغل</strong>
-              <small>{total ? `${num(doneCount)} من ${num(total)}` : 'لسه مفيش مهام'}</small>
+              <strong>المهام</strong>
+              <small>{total ? `${num(done)} من ${num(total)}` : 'لسه مفيش مهام'}</small>
             </div>
           </div>
-          {total > 0 && (
-            <button className="link-btn" onClick={() => setEditing(!editing)}>
-              {editing ? 'تم' : 'تعديل'}
-            </button>
-          )}
-        </div>
-
-        {daily.length > 0 && (
+          <span className="link-btn">
+            كل المهام <Icon name="chevronLeft" size={16} />
+          </span>
+        </button>
+        {pending.length > 0 ? (
           <ul className="tasks">
-            <li className="tasks-label">كل يوم</li>
-            {daily.map((t) => {
-              const done = checkedSet.has(`task:${t.id}`)
-              return (
-                <li key={t.id} className={`task ${done ? 'is-done' : ''}`}>
-                  <span className="task-title">{t.title}</span>
-                  {editing ? (
-                    <button className="icon-btn" onClick={() => remove(t)} aria-label="شيل المهمة">
-                      <Icon name="trash" size={18} />
-                    </button>
-                  ) : (
-                    <CheckButton done={done} onToggle={(d) => setCheck(today, `task:${t.id}`, d)} label={t.title} />
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-
-        {once.length > 0 && (
-          <ul className="tasks">
-            <li className="tasks-label">النهارده</li>
-            {once.map((t) => (
-              <li key={t.id} className={`task ${t.done ? 'is-done' : ''}`}>
-                <span className={`prio ${PRIORITY[t.priority]?.cls}`} title={PRIORITY[t.priority]?.label} />
-                <span className="task-title">
-                  {t.title}
-                  {!t.done && t.date < today && <small className="carried">من يوم قبل كده</small>}
-                </span>
-                {editing ? (
-                  <button className="icon-btn" onClick={() => remove(t)} aria-label="امسح المهمة">
-                    <Icon name="trash" size={18} />
-                  </button>
-                ) : (
-                  <CheckButton done={t.done} onToggle={(d) => toggleOnce(t, d)} label={t.title} />
-                )}
-              </li>
+            {pending.map((t) => (
+              <TaskItem key={`${t.kind}${t.id}`} t={t} done={false} today={today} />
             ))}
+            {more > 0 && <li className="tasks-label">و{num(more)} كمان…</li>}
           </ul>
-        )}
-
-        {adding ? (
-          <form className="add-task" onSubmit={add}>
-            <input
-              className="input"
-              placeholder="المهمة…"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              autoFocus
-              maxLength={80}
-            />
-            <div className="seg" role="radiogroup" aria-label="نوع المهمة">
-              <button type="button" className={kind === 'once' ? 'is-on' : ''} onClick={() => setKind('once')}>
-                النهارده بس
-              </button>
-              <button type="button" className={kind === 'daily' ? 'is-on' : ''} onClick={() => setKind('daily')}>
-                كل يوم
-              </button>
-            </div>
-            {kind === 'once' && (
-              <div className="seg" role="radiogroup" aria-label="الأولوية">
-                {[1, 2, 3].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    className={priority === p ? 'is-on' : ''}
-                    onClick={() => setPriority(p)}
-                  >
-                    <span className={`prio ${PRIORITY[p].cls}`} /> {PRIORITY[p].label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="row">
-              <button className="btn" type="submit">
-                ضيف
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={() => setAdding(false)}>
-                خلاص
-              </button>
-            </div>
-          </form>
         ) : (
-          <button className="btn btn-ghost btn-wide" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={18} />
-            ضيف مهمة شغل
-          </button>
+          total > 0 && <p className="muted">خلّصت كل مهام النهارده ✓</p>
         )}
       </div>
     </li>

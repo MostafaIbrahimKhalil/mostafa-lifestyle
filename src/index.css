@@ -1300,3 +1300,306 @@ select.input {
   box-shadow: none;
   background: transparent;
 }
+
+/* ===== المهام ===== */
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.task-meta small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cat-tag {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--cat);
+  background: color-mix(in srgb, var(--cat) 12%, transparent);
+  text-decoration: none;
+  display: inline-block;
+}
+
+.prio.p-repeat {
+  background: transparent;
+  border: 2px solid var(--c-work);
+}
+
+.task-group {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.bar-work > span {
+  background: var(--c-work);
+}
+
+.link-row {
+  border: 0;
+  background: none;
+  padding: 0;
+  width: 100%;
+  text-align: start;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.link-row .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.added-note {
+  align-self: center;
+}
+
+.back-btn {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 0 4px;
+  cursor: pointer;
+}
+
+.more-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 14px;
+  gap: 0;
+}
+
+.more-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.more-item {
+  width: 100%;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  text-align: start;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.more-item > svg {
+  color: var(--muted);
+}
+
+/* ===== تقدّمي ===== */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.stat strong {
+  font-size: 24px;
+  color: var(--c-faith);
+}
+
+.stat strong small {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.stat span {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insight {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.insight > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.insight strong {
+  font-size: 15px;
+}
+
+.insight small {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.insight-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: var(--c-health);
+}
+
+.insight-goal .insight-dot {
+  background: var(--c-goals);
+}
+
+.insight-balance .insight-dot {
+  background: var(--gold);
+}
+
+.goal-pct {
+  font-weight: 700;
+  color: var(--c-goals);
+  font-size: 15px;
+}
+
+.bar-goal > span {
+  background: var(--c-goals);
+}
+
+.goal-steps-sum {
+  font-size: 13px;
+}
+
+.goal .goal-edit {
+  padding-inline-start: 0;
+}
+
+.bar[style*='--bar'] > span {
+  background: var(--bar);
+}
+
+.habit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.habits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.habit {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.habit:last-child {
+  border-bottom: 0;
+}
+
+.habit-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.habit-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.habit-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.habit-meta svg {
+  color: var(--gold);
+}
+
+.habit-viz {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-thin {
+  flex: 1;
+  height: 5px;
+}
+
+.dots {
+  display: flex;
+  gap: 3px;
+}
+
+.dotd {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--surface-2);
+}
+
+.dotd.on {
+  background: var(--c-faith);
+}
+
+.st-formed {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+
+.st-building {
+  background: color-mix(in srgb, var(--c-family) 14%, transparent);
+  color: var(--c-family);
+}
+
+.st-slipped,
+.st-weak {
+  background: color-mix(in srgb, var(--warn) 13%, transparent);
+  color: var(--warn);
+}

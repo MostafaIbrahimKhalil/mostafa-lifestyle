@@ -33,7 +33,11 @@ export default function Tasbih({ settings }) {
 
   async function tap() {
     navigator.vibrate?.(count + 1 === target ? [20, 40, 20] : 8)
-    await db.tasbih.put({ id, date: today, phrase, count: count + 1 })
+    // قراءة وكتابة في نفس العملية عشان الضغط السريع ما يضيعش ولا تسبيحة
+    await db.transaction('rw', db.tasbih, async () => {
+      const row = await db.tasbih.get(id)
+      await db.tasbih.put({ id, date: today, phrase, count: (row?.count || 0) + 1 })
+    })
   }
 
   async function reset() {

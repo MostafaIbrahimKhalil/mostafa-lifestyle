@@ -6,6 +6,9 @@ import { useSettings } from './hooks.js'
 import { todayKey } from './lib/dates.js'
 import Icon from './components/Icon.jsx'
 import Today from './screens/Today.jsx'
+import Tasks from './screens/Tasks.jsx'
+import Progress from './screens/Progress.jsx'
+import More from './screens/More.jsx'
 import Month from './screens/Month.jsx'
 import Year from './screens/Year.jsx'
 import Tasbih from './screens/Tasbih.jsx'
@@ -13,14 +16,15 @@ import Settings from './screens/Settings.jsx'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
-  { id: 'month', label: 'الشهر', icon: 'month' },
-  { id: 'year', label: 'السنة', icon: 'star' },
+  { id: 'tasks', label: 'المهام', icon: 'list' },
+  { id: 'progress', label: 'تقدّمي', icon: 'chart' },
   { id: 'tasbih', label: 'التسبيح', icon: 'beads' },
-  { id: 'settings', label: 'الإعدادات', icon: 'gear' },
+  { id: 'more', label: 'المزيد', icon: 'more' },
 ]
 
 export default function App() {
   const [tab, setTab] = useState('today')
+  const [sub, setSub] = useState(null) // صفحة جوه "المزيد"
   const settings = useSettings()
 
   const {
@@ -44,6 +48,12 @@ export default function App() {
 
   function switchTab(id) {
     setTab(id)
+    setSub(null)
+    window.scrollTo({ top: 0 })
+  }
+
+  function openSub(id) {
+    setSub(id)
     window.scrollTo({ top: 0 })
   }
 
@@ -59,12 +69,20 @@ export default function App() {
       )}
 
       {settings && (
-        <main className="screen" key={tab}>
-          {tab === 'today' && <Today settings={settings} aspects={ASPECTS} />}
-          {tab === 'month' && <Month settings={settings} />}
-          {tab === 'year' && <Year settings={settings} />}
+        <main className="screen" key={`${tab}-${sub}`}>
+          {tab === 'today' && <Today settings={settings} aspects={ASPECTS} onOpenTasks={() => switchTab('tasks')} />}
+          {tab === 'tasks' && <Tasks />}
+          {tab === 'progress' && <Progress settings={settings} />}
           {tab === 'tasbih' && <Tasbih settings={settings} />}
-          {tab === 'settings' && <Settings settings={settings} />}
+          {tab === 'more' && sub && (
+            <button className="back-btn" onClick={() => setSub(null)}>
+              <Icon name="chevronRight" size={18} /> المزيد
+            </button>
+          )}
+          {tab === 'more' && !sub && <More onOpen={openSub} />}
+          {tab === 'more' && sub === 'month' && <Month settings={settings} />}
+          {tab === 'more' && sub === 'year' && <Year settings={settings} />}
+          {tab === 'more' && sub === 'settings' && <Settings settings={settings} />}
         </main>
       )}
 

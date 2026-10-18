@@ -1,0 +1,33 @@
+import Icon from '../components/Icon.jsx'
+
+const ITEMS = [
+  { id: 'month', label: 'الشهر', sub: 'التقويم والتزامك ومهام كل شهر', icon: 'month' },
+  { id: 'year', label: 'السنة', sub: 'التزامك شهر بشهر', icon: 'star' },
+  { id: 'settings', label: 'الإعدادات', sub: 'المكان، النوم، الورد، النسخة الاحتياطية', icon: 'gear' },
+]
+
+export default function More({ onOpen }) {
+  return (
+    <>
+      <header className="page-head">
+        <h1>المزيد</h1>
+      </header>
+      <ul className="more-list card">
+        {ITEMS.map((it) => (
+          <li key={it.id}>
+            <button className="more-item" onClick={() => onOpen(it.id)}>
+              <span className="card-icon">
+                <Icon name={it.icon} />
+              </span>
+              <span className="tl-text">
+                <strong>{it.label}</strong>
+                <small>{it.sub}</small>
+              </span>
+              <Icon name="chevronLeft" size={18} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}

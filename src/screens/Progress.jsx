@@ -1,0 +1,224 @@
+import { useMemo, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import Goals from '../components/Goals.jsx'
+import { daysLeft, goalProgress } from '../lib/goals.js'
+import Icon from '../components/Icon.jsx'
+import { db } from '../db.js'
+import { addDays, dateKey, fromKey, num, todayKey } from '../lib/dates.js'
+import { FORMED_DAYS, STATUS, habitDefs, habitStats, indexChecks } from '../lib/habits.js'
+
+const ASPECT_NAMES = { faith: 'العبادة', health: 'الصحة', work: 'المهام' }
+const ASPECT_COLORS = { faith: 'var(--c-faith)', health: 'var(--c-health)', work: 'var(--c-work)' }
+const pct = (r) => (r === null || r === undefined ? '—' : `${num(Math.round(r * 100))}٪`)
+
+export default function Progress({ settings }) {
+  const today = todayKey()
+  const checks = useLiveQuery(() => db.checks.toArray(), [])
+  const tasks = useLiveQuery(() => db.tasks.toArray(), [])
+  const goals = useLiveQuery(() => db.goals.orderBy('order').toArray(), [])
+  const [showAll, setShowAll] = useState(false)
+
+  const data = useMemo(() => {
+    if (!checks || !tasks) return null
+    const byDate = indexChecks(checks)
+    const habits = habitDefs(settings, tasks).map((d) => habitStats(d, byDate, settings.firstUse))
+    return { habits, balance: balanceFor(habits, tasks, today) }
+  }, [checks, tasks, settings, today])
+
+  if (!data || !goals) return null
+  const { habits, balance } = data
+  const formed = habits.filter((h) => h.status === 'formed').length
+  const bestNow = habits.reduce((m, h) => (h.current > m.current ? h : m), habits[0])
+  const insights = buildInsights(habits, goals, balance)
+  const groups = {}
+  for (const h of habits) (groups[h.group] ||= []).push(h)
+  const visibleGroups = showAll ? Object.entries(groups) : Object.entries(groups).slice(0, 3)
+
+  return (
+    <>
+      <header className="page-head">
+        <h1>تقدّمي</h1>
+        <p className="muted">إنت وصلت فين، واتعودت على إيه، وناقصك إيه</p>
+      </header>
+
+      <div className="stat-row">
+        <div className="stat">
+          <strong>
+            {num(formed)}
+            <small>/{num(habits.length)}</small>
+          </strong>
+          <span>عادات اتكونت</span>
+        </div>
+        <div className="stat">
+          <strong>{num(bestNow?.current || 0)}</strong>
+          <span>أطول سلسلة شغالة</span>
+        </div>
+        <div className="stat">
+          <strong>{pct(balance.overall7)}</strong>
+          <span>التزام آخر ٧ أيام</span>
+        </div>
+      </div>
+
+      <section className="card insights">
+        <h2>ناقصني إيه؟</h2>
+        {insights.length === 0 ? (
+          <p className="muted">لسه بدري — بعد كام يوم من الاستخدام هيظهرلك هنا أضعف حاجات عندك.</p>
+        ) : (
+          <ul className="insight-list">
+            {insights.map((i, k) => (
+              <li key={k} className={`insight insight-${i.kind}`}>
+                <span className="insight-dot" />
+                <span>
+                  <strong>{i.title}</strong>
+                  <small>{i.text}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Goals goals={goals} />
+
+      <section className="card">
+        <h2>توازني</h2>
+        <ul className="bars">
+          {Object.keys(ASPECT_NAMES).map((a) => (
+            <li key={a}>
+              <div className="row-between">
+                <span>
+                  <span className="swatch" style={{ background: ASPECT_COLORS[a] }} /> {ASPECT_NAMES[a]}
+                </span>
+                <span className="muted">
+                  ٧ أيام {pct(balance[a].r7)} · ٣٠ يوم {pct(balance[a].r30)}
+                </span>
+              </div>
+              <span className="bar" style={{ '--bar': ASPECT_COLORS[a] }}>
+                <span style={{ width: `${(balance[a].r7 || 0) * 100}%` }} />
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="muted">الفلوس والمواعيد هيدخلوا الميزان لما أقسامهم تشتغل.</p>
+      </section>
+
+      <section className="card">
+        <div className="row-between">
+          <h2>عاداتي</h2>
+          <span className="pill">العادة بتتكوّن في {num(FORMED_DAYS)} يوم</span>
+        </div>
+        {visibleGroups.map(([group, list]) => (
+          <div key={group} className="habit-group">
+            <span className="tasks-label">{group}</span>
+            <ul className="habits">
+              {list.map((h) => (
+                <HabitRow key={h.id} h={h} />
+              ))}
+            </ul>
+          </div>
+        ))}
+        {Object.keys(groups).length > 3 && (
+          <button className="btn btn-ghost btn-wide" onClick={() => setShowAll(!showAll)}>
+            {showAll ? 'أقل' : 'اعرض كل العادات'}
+          </button>
+        )}
+      </section>
+    </>
+  )
+}
+
+function HabitRow({ h }) {
+  const st = STATUS[h.status]
+  return (
+    <li className="habit">
+      <div className="row-between">
+        <span className="habit-name">{h.name}</span>
+        <span className={`pill ${st.cls}`}>{st.label}</span>
+      </div>
+      <div className="habit-meta">
+        <span title="الأيام المتتالية">
+          <Icon name="flame" size={15} /> {num(h.current)} يوم
+        </span>
+        <span>أطول: {num(h.best)}</span>
+        <span>قوتها: {num(Math.round(h.score * 100))}٪</span>
+      </div>
+      <div className="habit-viz">
+        <span className="bar bar-thin" title={`فاضل ${h.toFormed} يوم`}>
+          <span style={{ width: `${Math.min(1, h.current / FORMED_DAYS) * 100}%` }} />
+        </span>
+        <span className="dots" aria-label="آخر ١٤ يوم">
+          {h.last14.map((d, i) => (
+            <span key={i} className={`dotd ${d ? 'on' : ''}`} />
+          ))}
+        </span>
+      </div>
+    </li>
+  )
+}
+
+// نسبة كل جانب في آخر ٧ و٣٠ يوم
+function balanceFor(habits, tasks, today) {
+  const avg = (arr, key) => {
+    const vals = arr.map((h) => h[key]).filter((v) => v !== null && v !== undefined)
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null
+  }
+  const onceRate = (n) => {
+    const from = dateKey(addDays(fromKey(today), -n))
+    const due = tasks.filter((t) => t.kind === 'once' && t.date >= from && t.date < today)
+    return due.length ? due.filter((t) => t.done).length / due.length : null
+  }
+  const out = {}
+  for (const a of ['faith', 'health']) {
+    const hs = habits.filter((h) => h.aspect === a)
+    out[a] = { r7: avg(hs, 'rate7'), r30: avg(hs, 'rate30') }
+  }
+  const wh = habits.filter((h) => h.aspect === 'work')
+  const mix = (x, y) => (x === null ? y : y === null ? x : (x + y) / 2)
+  out.work = { r7: mix(avg(wh, 'rate7'), onceRate(7)), r30: mix(avg(wh, 'rate30'), onceRate(30)) }
+  const vals7 = Object.values(out).map((v) => v.r7).filter((v) => v !== null)
+  out.overall7 = vals7.length ? vals7.reduce((s, v) => s + v, 0) / vals7.length : null
+  return out
+}
+
+// أهم ٤ حاجات ناقصاك دلوقتي
+function buildInsights(habits, goals, balance) {
+  const out = []
+  const weak = habits
+    .filter((h) => h.window7 >= 3 && h.rate7 !== null && h.rate7 < 0.8)
+    .sort((a, b) => a.rate7 - b.rate7 || b.misses7 - a.misses7)
+    .slice(0, 3)
+  for (const h of weak) {
+    out.push({
+      kind: 'habit',
+      title: h.name,
+      text: `فاتتك ${num(h.misses7)} مرة من آخر ${num(h.window7)} أيام`,
+    })
+  }
+  const slipped = habits.find((h) => h.status === 'slipped')
+  if (slipped && !weak.includes(slipped)) {
+    out.push({ kind: 'habit', title: slipped.name, text: `كانت متكونة (${num(slipped.best)} يوم) ووقعت، رجّعها النهارده` })
+  }
+  for (const g of goals.filter((g) => !g.done)) {
+    const left = daysLeft(g)
+    const p = goalProgress(g)
+    if (!g.targetDate) {
+      out.push({ kind: 'goal', title: g.title, text: 'حدد له معاد وقسّمه لخطوات عشان تعرف إنت فين' })
+    } else if (left !== null && left <= 45 && p < 1) {
+      out.push({
+        kind: 'goal',
+        title: g.title,
+        text: left >= 0 ? `فاضل ${num(left)} يوم وخلصت ${num(Math.round(p * 100))}٪ بس` : 'المعاد عدّى — حدد معاد جديد',
+      })
+    } else if (!(g.steps || []).length) {
+      out.push({ kind: 'goal', title: g.title, text: 'قسّمه لخطوات صغيرة' })
+    }
+  }
+  const aspects = ['faith', 'health', 'work'].filter((a) => balance[a].r7 !== null)
+  if (aspects.length >= 2) {
+    const low = aspects.reduce((m, a) => (balance[a].r7 < balance[m].r7 ? a : m), aspects[0])
+    if (balance[low].r7 < 0.6) {
+      out.push({ kind: 'balance', title: `الميزان مايل بعيد عن ${ASPECT_NAMES[low]}`, text: `${pct(balance[low].r7)} بس في آخر ٧ أيام` })
+    }
+  }
+  return out.slice(0, 5)
+}
