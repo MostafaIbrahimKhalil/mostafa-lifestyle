@@ -2387,3 +2387,163 @@ select.input {
 .lg-received {
   background: var(--c-money);
 }
+
+/* ===== المحفظة ===== */
+.net-card .net {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--c-money);
+  font-variant-numeric: tabular-nums;
+}
+.net-grid,
+.flow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.net-grid > *,
+.flow > * {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  text-align: start;
+  color: var(--text);
+  font: inherit;
+}
+.net-grid small,
+.flow small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.net-grid strong,
+.flow strong {
+  font-size: 17px;
+}
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.quick-grid .btn {
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 4px;
+  font-size: 13px;
+}
+.pos {
+  color: var(--c-faith);
+}
+.neg {
+  color: var(--c-health);
+}
+.chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.env-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.btn-wide + .btn-wide {
+  margin-top: 8px;
+}
+
+/* ===== تقرير التوازن ===== */
+.bal-group + .bal-group {
+  margin-top: 14px;
+}
+.bal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.bal-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.bal-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.bal-item:last-child {
+  border-bottom: 0;
+}
+.bal-item .rate {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+  min-width: 70px;
+  text-align: end;
+}
+.bal-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.bal-tag.strong {
+  color: var(--c-faith);
+  background: color-mix(in srgb, var(--c-faith) 12%, transparent);
+}
+.bal-tag.weak {
+  color: var(--c-health);
+  background: color-mix(in srgb, var(--c-health) 12%, transparent);
+}
+.bal-tag.mid {
+  color: var(--c-money);
+  background: color-mix(in srgb, var(--c-money) 12%, transparent);
+}
+.bal-say {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 8px;
+}
+summary.bal-head {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 0;
+}
+summary.bal-head::-webkit-details-marker {
+  display: none;
+}
+summary.bal-head::after {
+  content: '‹';
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+details[open] > summary.bal-head::after {
+  transform: rotate(-90deg);
+}
+.env-row > .row-between {
+  width: 100%;
+}
+.env-row small {
+  text-align: start;
+}
+.task-title.link-row,
+.link-row.env-row {
+  align-items: stretch;
+  text-align: start;
+}
+.icon-spacer {
+  width: 40px;
+  flex-shrink: 0;
+}

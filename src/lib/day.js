@@ -65,8 +65,8 @@ export function buildDay(day, settings) {
     rows.push({
       type: 'check',
       id: 'hifz',
-      title: 'حفظ ٣ آيات',
-      subtitle: 'ومراجعة اللي قبلها',
+      title: 'الحفظ',
+      subtitle: 'جديد ومراجعة',
       icon: 'book',
       time: new Date(slotTime.getTime() + 11 * MIN),
       hideTime: true,

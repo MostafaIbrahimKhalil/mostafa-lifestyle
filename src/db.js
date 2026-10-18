@@ -54,6 +54,25 @@ db.version(4).stores({
   payments: '++id, clientId, date',
 })
 
+db.version(5).stores({
+  // دروس الحفظ: { id (ترتيبه)، surah, from, to, startedAt, memorizedAt, steadyAt, reviews: [{date, ok}], interval, nextReview }
+  hifzLessons: 'id, nextReview',
+  // المحفظة
+  // الحسابات: { id, name, type: 'cash'|'bank'|'wallet'|'gold', opening, order, active }
+  accounts: '++id',
+  // الحركات: { id, date, type: 'expense'|'income'|'transfer'|'adjust'|'toEnvelope'|'fromEnvelope',
+  //   amount (جنيه، أو جرام في حساب الدهب), accountId, toAccountId, envelopeId, category, note, paymentId, obligationId, month }
+  txns: '++id, date, accountId, envelopeId, obligationId, paymentId',
+  // الأظرف: { id, name, target, kind: 'cash'|'gold', priority, order, active }
+  envelopes: '++id',
+  // الالتزامات الشهرية: { id, name, amount, dueDay, category, active }
+  obligations: '++id',
+  // مشتريات الشهر: { id, name, active, boughtMonths: ['YYYY-MM'] }
+  shopping: '++id',
+  // عليّا: { id, person, amount, date, note, paid: [{date, amount}], settled }
+  debts: '++id',
+})
+
 // أهداف السنة المبدئية — بتتضاف مرة واحدة بس
 export async function seedDefaults() {
   const seeded = await getSetting('seededGoals', false)

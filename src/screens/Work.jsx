@@ -421,7 +421,7 @@ function ClientView({ client, ledger, today, onBack, onForm }) {
                 </span>
                 <button
                   className="icon-btn"
-                  onClick={() => window.confirm(`تمسح دفعة ${money(p.amount)}؟`) && db.payments.delete(p.id)}
+                  onClick={() => window.confirm(`تمسح دفعة ${money(p.amount)}؟`) && deletePayment(p.id)}
                   aria-label="امسح الدفعة"
                 >
                   <Icon name="trash" size={17} />
@@ -537,6 +537,13 @@ function JobForm({ clients, clientId, today, onDone }) {
   )
 }
 
+async function deletePayment(id) {
+  await db.transaction('rw', db.payments, db.txns, async () => {
+    await db.payments.delete(id)
+    await db.txns.where('paymentId').equals(id).delete()
+  })
+}
+
 function PaymentForm({ clients, clientId, jobs, today, onDone }) {
   const [cid, setCid] = useState(clientId || clients[0]?.id)
   const client = clients.find((c) => c.id === Number(cid))
@@ -544,6 +551,9 @@ function PaymentForm({ clients, clientId, jobs, today, onDone }) {
   const [date, setDate] = useState(today)
   const [jobId, setJobId] = useState('')
   const [note, setNote] = useState('')
+  const accounts = useLiveQuery(() => db.accounts.toArray(), []) || []
+  const accChoices = accounts.filter((a) => a.active !== false && a.type !== 'gold')
+  const [accountId, setAccountId] = useState('')
   const clientJobs = jobs
     .filter((j) => j.clientId === Number(cid) && !j.cancelled)
     .sort((a, b) => (b.month || b.receivedDate || '').localeCompare(a.month || a.receivedDate || ''))
@@ -553,7 +563,23 @@ function PaymentForm({ clients, clientId, jobs, today, onDone }) {
     e.preventDefault()
     const v = Number(String(amount).replace(/[,٬]/g, ''))
     if (!client || !v) return
-    await db.payments.add({ clientId: client.id, amount: v, date, jobId: jobId ? Number(jobId) : null, note: note.trim() })
+    await db.transaction('rw', db.payments, db.txns, async () => {
+      const pid = await db.payments.add({ clientId: client.id, amount: v, date, jobId: jobId ? Number(jobId) : null, note: note.trim() })
+      const acc = Number(accountId || accChoices[0]?.id)
+      if (acc) {
+        await db.txns.add({
+          type: 'income',
+          amount: v,
+          accountId: acc,
+          category: 'شغل',
+          note: client.name,
+          date,
+          month: date.slice(0, 7),
+          paymentId: pid,
+          createdAt: new Date().toISOString(),
+        })
+      }
+    })
     onDone()
   }
 
@@ -584,6 +610,18 @@ function PaymentForm({ clients, clientId, jobs, today, onDone }) {
           <span>التاريخ</span>
           <input className="input" type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />
         </label>
+        {accChoices.length > 0 && (
+          <label className="field">
+            <span>دخلت فين؟ (بتتسجل في المحفظة)</span>
+            <select className="input" value={accountId || accChoices[0].id} onChange={(e) => setAccountId(e.target.value)}>
+              {accChoices.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field">
           <span>عن شغلانة معينة؟ (اختياري — لو سبتها بتتوزع على الأقدم)</span>
           <select className="input" value={jobId} onChange={(e) => setJobId(e.target.value)}>

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Goals from '../components/Goals.jsx'
 import BodyWeight from '../components/BodyWeight.jsx'
-import { SURAH, hifzSummary, nextHifz } from '../lib/hifz.js'
+import BalanceReport from '../components/BalanceReport.jsx'
+import { lessonTitle, summary as hifzSummary, todayPlan } from '../lib/hifz.js'
 import { clientLedger, money, monthStats } from '../lib/work.js'
 import { monthKey } from '../lib/dates.js'
 import { daysLeft, goalProgress } from '../lib/goals.js'
@@ -12,7 +13,6 @@ import { addDays, dateKey, fromKey, num, todayKey } from '../lib/dates.js'
 import { FORMED_DAYS, STATUS, habitDefs, habitStats, indexChecks } from '../lib/habits.js'
 
 const ASPECT_NAMES = { faith: 'العبادة', health: 'الصحة', work: 'المهام' }
-const ASPECT_COLORS = { faith: 'var(--c-faith)', health: 'var(--c-health)', work: 'var(--c-work)' }
 const pct = (r) => (r === null || r === undefined ? '—' : `${num(Math.round(r * 100))}٪`)
 
 export default function Progress({ settings, onOpenHifz, onOpenWork }) {
@@ -20,7 +20,7 @@ export default function Progress({ settings, onOpenHifz, onOpenWork }) {
   const checks = useLiveQuery(() => db.checks.toArray(), [])
   const tasks = useLiveQuery(() => db.tasks.toArray(), [])
   const goals = useLiveQuery(() => db.goals.orderBy('order').toArray(), [])
-  const hifz = useLiveQuery(() => db.hifz.toArray(), [])
+  const hifz = useLiveQuery(() => db.hifzLessons.toArray(), [])
   const workData = useLiveQuery(async () => {
     const [clients, jobs, payments] = await Promise.all([db.clients.toArray(), db.jobs.toArray(), db.payments.toArray()])
     if (!clients.length) return null
@@ -47,7 +47,7 @@ export default function Progress({ settings, onOpenHifz, onOpenWork }) {
 
   if (!data || !goals || !hifz) return null
   const hs = hifzSummary(hifz)
-  const hn = nextHifz(hifz)
+  const hp = todayPlan(hifz, settings.hifzPace || 'everyOther')
   const { habits, balance, prayerMix } = data
   const prayerTotal = Object.values(prayerMix).reduce((a, b) => a + b, 0)
   const formed = habits.filter((h) => h.status === 'formed').length
@@ -110,9 +110,9 @@ export default function Progress({ settings, onOpenHifz, onOpenWork }) {
         <span>
           <strong>حفظ القرآن: {num((Math.round(hs.ratio * 1000) / 10).toFixed(1))}٪</strong>
           <small>
-            {hifz.length
-              ? `${num(hs.memorized)} سورة حافظها${hn ? `، كمّل ${SURAH[hn.surah].name}` : ''}`
-              : 'سجّل السور اللي حافظها وبتحفظ فيها'}
+            {hp.lesson
+              ? `${num(hs.ayahs)} آية، ${num(hs.surahs)} سورة، ${hp.mode === 'new' ? `الجديد: ${lessonTitle(hp.lesson)}` : hp.mode === 'steady' ? 'النهارده تثبيت' : 'خلّصت النهارده ✓'}${hp.due.length ? `، ${num(hp.due.length)} تسميع` : ''}`
+              : 'ابدأ من سورة الناس'}
           </small>
         </span>
         <Icon name="chevronLeft" size={18} />
@@ -135,27 +135,7 @@ export default function Progress({ settings, onOpenHifz, onOpenWork }) {
 
       <BodyWeight settings={settings} />
 
-      <section className="card">
-        <h2>توازني</h2>
-        <ul className="bars">
-          {Object.keys(ASPECT_NAMES).map((a) => (
-            <li key={a}>
-              <div className="row-between">
-                <span>
-                  <span className="swatch" style={{ background: ASPECT_COLORS[a] }} /> {ASPECT_NAMES[a]}
-                </span>
-                <span className="muted">
-                  ٧ أيام {pct(balance[a].r7)}، ٣٠ يوم {pct(balance[a].r30)}
-                </span>
-              </div>
-              <span className="bar" style={{ '--bar': ASPECT_COLORS[a] }}>
-                <span style={{ width: `${(balance[a].r7 || 0) * 100}%` }} />
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p className="muted">الفلوس والمواعيد هيدخلوا الميزان لما أقسامهم تشتغل.</p>
-      </section>
+      <BalanceReport habits={habits} checks={checks} balance={balance} />
 
       <section className="card">
         <div className="row-between">

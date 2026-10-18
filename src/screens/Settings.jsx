@@ -229,6 +229,8 @@ export default function Settings({ settings }) {
           ['prayerAt', 'وقت الأذان'],
           ['adhkar', 'أذكار الصباح والمساء والنوم'],
           ['wird', 'الورد'],
+          ['hifz', 'الحفظ والتسميع'],
+          ['bills', 'الالتزامات الشهرية'],
           ['teeth', 'أسنان الليل'],
           ['gym', 'الجيم (قبلها بنص ساعة)'],
         ].map(([key, label]) => (

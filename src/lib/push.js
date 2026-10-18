@@ -5,6 +5,8 @@ import { DEFAULT_SLEEP } from './day.js'
 import { PRAYERS, prayerTimesFor } from './prayer.js'
 import { DEFAULT_GYM_TIME, routineFor } from './workout.js'
 import { backupDue } from './backup.js'
+import { lessonTitle, todayPlan } from './hifz.js'
+import { obligationsFor } from './wallet.js'
 
 export const PUSH_URL = 'https://mostafa-push.ui-designer-mostafa-ibrahim.workers.dev'
 const MIN = 60 * 1000
@@ -16,6 +18,8 @@ export const NOTIFY_DEFAULTS = {
   teeth: true,
   gym: true,
   wird: true,
+  hifz: true,
+  bills: true,
 }
 
 export function notifyPrefs(settings) {
@@ -81,6 +85,60 @@ export async function buildSchedule(settings, now = new Date()) {
     if (prefs.gym && routine && !routine.optional) {
       const at = timeOnDay(day, settings.gymTime || DEFAULT_GYM_TIME)
       push(new Date(at.getTime() - 30 * MIN), `${routine.name} بعد نص ساعة 💪`, 'جهّز هدومك ومية', 'gym', 'gym', i)
+    }
+  }
+  // الحفظ: الجديد الصبح، والتسميع بعد العصر وقبل النوم، والمراجعة بعد العشا
+  if (prefs.hifz && settings.hifzEnabled !== false) {
+    const rows = await db.hifzLessons.toArray()
+    const pace = settings.hifzPace || 'everyOther'
+    const p = todayPlan(rows, pace, dateKey(today))
+    const t = prayerTimesFor(today, settings.location || undefined)
+    const sleep = timeOnDay(today, settings.sleepTime || DEFAULT_SLEEP)
+    const l = p.lesson
+    if (l && p.mode === 'new')
+      push(new Date(t.sunrise.getTime() + 30 * MIN), 'حفظ النهارده', `${lessonTitle(l)}، ٣ آيات بس`, 'hifz-new', null, 0)
+    if (l && p.mode === 'doneToday') {
+      const done = new Set(l.sameDay || [])
+      if (!done.has('r2')) push(new Date(t.asr.getTime() + 30 * MIN), 'سمّع حفظ النهارده', `${lessonTitle(l)}، ٣ مرات أو صلّي بيها`, 'hifz-r2', null, 0)
+      if (!done.has('r3')) push(new Date(sleep.getTime() - 30 * MIN), 'تسميع قبل النوم', lessonTitle(l), 'hifz-r3', null, 0)
+    }
+    if (l && p.mode === 'steady')
+      push(new Date(t.asr.getTime() + 30 * MIN), 'يوم تثبيت', `سمّع ${lessonTitle(l)} واربطها باللي قبلها`, 'hifz-steady', null, 0)
+    if (p.due.length)
+      push(new Date(t.isha.getTime() + 40 * MIN), 'تسميع المراجعة', `عليك ${p.due.length.toLocaleString('ar-EG')} تسميع النهارده`, 'hifz-review', null, 0)
+    // بكرة: الجديد ولا التثبيت (بيتحدّث تاني لما تفتح التطبيق)
+    const tomorrow = addDays(today, 1)
+    const t1 = prayerTimesFor(tomorrow, settings.location || undefined)
+    const tomorrowNew = !(pace === 'everyOther' && p.mode === 'doneToday')
+    push(
+      new Date(t1.sunrise.getTime() + 30 * MIN),
+      tomorrowNew ? 'حفظ النهارده' : 'يوم تثبيت',
+      tomorrowNew ? '٣ آيات جديدة' : 'سمّع اللي حفظته امبارح',
+      'hifz-new',
+      null,
+      1,
+    )
+  }
+  // الالتزامات: تذكير بالليل قبل معادها بيوم، ويوم المعاد الصبح
+  if (prefs.bills) {
+    const [obligations, txns] = await Promise.all([db.obligations.toArray(), db.txns.where('obligationId').above(0).toArray()])
+    for (let i = 0; i < 2; i++) {
+      const day = addDays(today, i)
+      const next = addDays(day, 1)
+      for (const k of [dateKey(day), dateKey(next)]) {
+        for (const o of obligationsFor(k.slice(0, 7), obligations, txns)) {
+          if (o.paid || o.due !== k) continue
+          const isToday = k === dateKey(day)
+          push(
+            timeOnDay(day, isToday ? '10:00' : '20:00'),
+            isToday ? `النهارده معاد ${o.name}` : `بكرة معاد ${o.name}`,
+            `${Math.round(o.amount).toLocaleString('ar-EG')} جنيه`,
+            `bill-${o.id}-${k}`,
+            null,
+            i,
+          )
+        }
+      }
     }
   }
   // تذكير بالنسخة الاحتياطية الساعة ٩ بالليل لو مستحقة

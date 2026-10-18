@@ -27,6 +27,7 @@ import { MEALS, WATER_TARGET } from '../lib/day.js'
 import QuranReader from './QuranReader.jsx'
 import AdhkarReader from './AdhkarReader.jsx'
 import Workout from './Workout.jsx'
+import { lessonTitle, todayPlan } from '../lib/hifz.js'
 import { backupDue, shareBackup } from '../lib/backup.js'
 
 export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
@@ -42,6 +43,16 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
   const [overlay, setOverlay] = useState(null) // { kind: 'quran'|'adhkar'|'gym', ... }
 
   const checks = useLiveQuery(() => db.checks.where('date').equals(today).toArray(), [today])
+  const hifzRows = useLiveQuery(() => db.hifzLessons.toArray(), [])
+  const hifzRow = useMemo(() => {
+    if (!hifzRows) return {}
+    const p = todayPlan(hifzRows, settings.hifzPace || 'everyOther', today)
+    const due = p.due.length ? `، ${num(p.due.length)} تسميع مراجعة` : ''
+    if (!p.lesson) return { title: 'مراجعة الحفظ', subtitle: due ? due.slice(2) : 'خلصت ✓' }
+    if (p.mode === 'new') return { title: 'حفظ جديد', subtitle: `${lessonTitle(p.lesson)}${due}` }
+    if (p.mode === 'steady') return { title: 'تثبيت الحفظ', subtitle: `${lessonTitle(p.lesson)}${due}` }
+    return { title: 'الحفظ', subtitle: `حفظت ${lessonTitle(p.lesson)}${due || '، سمّعه بعد ساعة وقبل النوم'}` }
+  }, [hifzRows, settings.hifzPace, today])
   const allTasks = useLiveQuery(() => db.tasks.toArray(), [])
 
   const { rows, times } = buildDay(day, settings)
@@ -234,7 +245,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
             return (
               <CheckRow
                 key={r.id}
-                row={r}
+                row={{ ...r, ...hifzRow }}
                 done={checkedSet.has(r.id)}
                 onToggle={(d) => toggle(r.id, d)}
                 onOpen={onOpenHifz}

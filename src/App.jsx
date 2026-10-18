@@ -5,6 +5,7 @@ import { ASPECTS } from './aspects.js'
 import { useSettings } from './hooks.js'
 import { todayKey } from './lib/dates.js'
 import { sync } from './lib/push.js'
+import { seedWallet } from './lib/wallet.js'
 import Icon from './components/Icon.jsx'
 import Today from './screens/Today.jsx'
 import Tasks from './screens/Tasks.jsx'
@@ -17,12 +18,13 @@ import Settings from './screens/Settings.jsx'
 import Hifz from './screens/Hifz.jsx'
 import GymPlan from './screens/GymPlan.jsx'
 import Work from './screens/Work.jsx'
+import Wallet from './screens/Wallet.jsx'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
   { id: 'tasks', label: 'المهام', icon: 'list' },
   { id: 'progress', label: 'تقدّمي', icon: 'chart' },
-  { id: 'tasbih', label: 'التسبيح', icon: 'beads' },
+  { id: 'wallet', label: 'المحفظة', icon: 'wallet' },
   { id: 'more', label: 'المزيد', icon: 'more' },
 ]
 
@@ -57,6 +59,7 @@ export default function App() {
   useEffect(() => {
     requestPersistentStorage()
     seedDefaults()
+    seedWallet()
     ;(async () => {
       if (!(await getSetting('firstUse'))) await setSetting('firstUse', todayKey())
       await setSetting('lastOpened', new Date().toISOString())
@@ -120,7 +123,7 @@ export default function App() {
           {tab === 'progress' && (
             <Progress settings={settings} onOpenHifz={openHifz} onOpenWork={() => (setTab('more'), setSub('work'))} />
           )}
-          {tab === 'tasbih' && <Tasbih settings={settings} />}
+          {tab === 'wallet' && <Wallet settings={settings} onOpenWork={() => (setTab('more'), setSub('work'))} />}
           {tab === 'more' && sub && (
             <button className="back-btn" onClick={() => setSub(null)}>
               <Icon name="chevronRight" size={18} /> المزيد
@@ -130,9 +133,10 @@ export default function App() {
           {tab === 'more' && sub === 'month' && <Month settings={settings} />}
           {tab === 'more' && sub === 'year' && <Year settings={settings} />}
           {tab === 'more' && sub === 'settings' && <Settings settings={settings} />}
-          {tab === 'more' && sub === 'hifz' && <Hifz />}
+          {tab === 'more' && sub === 'hifz' && <Hifz settings={settings} />}
           {tab === 'more' && sub === 'gym' && <GymPlan settings={settings} />}
           {tab === 'more' && sub === 'work' && <Work />}
+          {tab === 'more' && sub === 'tasbih' && <Tasbih settings={settings} />}
         </main>
       )}
 

@@ -1,243 +1,322 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import '@fontsource/amiri-quran/arabic-400.css'
 import Icon from '../components/Icon.jsx'
-import { db } from '../db.js'
-import { num } from '../lib/dates.js'
-import QURAN from '../data/quran-index.json'
-import { HIFZ_STATUS, SURAH, hifzSummary, nextHifz } from '../lib/hifz.js'
+import { db, setSetting } from '../db.js'
+import { formatShortDate, fromKey, num, todayKey } from '../lib/dates.js'
+import {
+  INTERVALS,
+  PLAN,
+  SAME_DAY,
+  STEPS,
+  SURAH,
+  bumpReps,
+  juzOf,
+  lessonTitle,
+  markMemorized,
+  markSteady,
+  review,
+  startLesson,
+  summary,
+  syncHifzCheck,
+  todayPlan,
+  toggleSameDay,
+} from '../lib/hifz.js'
+import { loadJuz } from './QuranReader.jsx'
 
-export default function Hifz() {
-  const rows = useLiveQuery(() => db.hifz.toArray(), [])
-  const [adding, setAdding] = useState(false)
-  const [pick, setPick] = useState('')
-  const [pickStatus, setPickStatus] = useState('memorized')
-  const [open, setOpen] = useState(null)
-  const [showAllMem, setShowAllMem] = useState(false)
-  if (!rows) return null
+const juzCache = new Map()
+function getJuz(j) {
+  if (!juzCache.has(j)) juzCache.set(j, loadJuz(j).catch((e) => (juzCache.delete(j), Promise.reject(e))))
+  return juzCache.get(j)
+}
 
-  const sum = hifzSummary(rows)
-  const next = nextHifz(rows)
-  const have = new Set(rows.map((r) => r.surah))
-  const groups = ['learning', 'todo', 'paused', 'memorized'].map((st) => ({
-    st,
-    list: rows
-      .filter((r) => r.status === st)
-      .sort((a, b) => (st === 'memorized' ? b.surah - a.surah : a.priority - b.priority || a.surah - b.surah)),
-  }))
-
-  async function add(e) {
-    e.preventDefault()
-    const n = Number(pick)
-    if (!n || have.has(n)) return
-    await db.hifz.put({
-      surah: n,
-      status: pickStatus,
-      reached: pickStatus === 'memorized' ? SURAH[n].ayahs : 0,
-      priority: 2,
-      updatedAt: new Date().toISOString(),
-    })
-    setPick('')
-    setAdding(true)
-  }
-
-  // إضافة جزء عمّ كله مرة واحدة
-  async function addJuzAmma(status) {
-    const list = QURAN.surahs.filter((s) => s.n >= 78 && !have.has(s.n))
-    await db.hifz.bulkPut(
-      list.map((s) => ({
-        surah: s.n,
-        status,
-        reached: status === 'memorized' ? s.ayahs : 0,
-        priority: 2,
-        updatedAt: new Date().toISOString(),
-      })),
+function AyatText({ surah, from, to, hidden, onReveal }) {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const js = [...new Set([juzOf(surah, from), juzOf(surah, to)])]
+    Promise.all(js.map(getJuz))
+      .then((all) => alive && setRows(all.flat().filter((r) => r.s === surah && r.a >= from && r.a <= to)))
+      .catch(() => alive && setRows([]))
+    return () => {
+      alive = false
+    }
+  }, [surah, from, to])
+  if (!rows) return <p className="muted">بيفتح…</p>
+  if (hidden)
+    return (
+      <button className="hidden-ayat" onClick={onReveal}>
+        <Icon name="book" size={20} />
+        النص مستخبي — سمّع، ولو احتجت دوس هنا تبص
+      </button>
     )
-    setAdding(true)
-  }
+  return (
+    <p className="hifz-text">
+      {from === 1 && surah !== 1 && surah !== 9 && <span className="hifz-basmala">بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ</span>}
+      {rows.map((r) => (
+        <span key={r.a}>
+          {r.t} <span className="ayah-no">{num(r.a)}</span>{' '}
+        </span>
+      ))}
+    </p>
+  )
+}
+
+export default function Hifz({ settings }) {
+  const today = todayKey()
+  const rows = useLiveQuery(() => db.hifzLessons.toArray(), [])
+  const pace = settings?.hifzPace || 'everyOther'
+  const [hide, setHide] = useState(false)
+  const [openReview, setOpenReview] = useState(null)
+
+  useEffect(() => {
+    if (rows) syncHifzCheck(today, pace)
+  }, [rows, today, pace])
+
+  if (!rows) return null
+  const plan = todayPlan(rows, pace, today)
+  const sum = summary(rows)
+  const l = plan.lesson
+  const nextUp = PLAN.slice((l?.id || 0), (l?.id || 0) + 3)
+  const upcoming = rows
+    .filter((r) => r.memorizedAt && r.nextReview > today)
+    .sort((a, b) => a.nextReview.localeCompare(b.nextReview))
+    .slice(0, 5)
 
   return (
     <>
       <header className="page-head">
         <h1>حفظ القرآن</h1>
-        <p className="muted">إنت حافظ إيه، وبتحفظ في إيه، وتكمّل إيه الأول</p>
+        <p className="muted">
+          {pace === 'everyOther' ? '٣ آيات كل يومين: يوم حفظ ويوم تثبيت' : '٣ آيات كل يوم'}، من سورة الناس وطالع، ومراجعة بجدول
+        </p>
       </header>
 
       <div className="stat-row">
-        <div className="stat">
-          <strong>{num((Math.round(sum.ratio * 1000) / 10).toFixed(1))}٪</strong>
-          <span>من القرآن</span>
-        </div>
         <div className="stat">
           <strong>{num(sum.ayahs)}</strong>
           <span>آية حافظها</span>
         </div>
         <div className="stat">
-          <strong>{num(sum.memorized)}</strong>
+          <strong>{num(sum.surahs)}</strong>
           <span>سورة كاملة</span>
+        </div>
+        <div className="stat">
+          <strong>{num((Math.round(sum.ratio * 1000) / 10).toFixed(1))}٪</strong>
+          <span>من القرآن</span>
         </div>
       </div>
 
-      {next && (
-        <section className="card next-hifz">
-          <span className="tasks-label">كمّل دي الأول</span>
-          <HifzRow r={next} open={open === next.surah} onToggle={() => setOpen(open === next.surah ? null : next.surah)} />
+      {/* ===== الجديد / التثبيت ===== */}
+      {l && (plan.mode === 'new' || plan.mode === 'doneToday') && (
+        <section className={`card hifz-lesson ${plan.mode === 'doneToday' ? 'is-done' : ''}`}>
+          <div className="row-between">
+            <span className="tasks-label">{plan.mode === 'doneToday' ? 'حفظ النهارده ✓' : 'حفظ جديد النهارده'}</span>
+            <span className="pill">درس {num(l.id)} من {num(PLAN.length)}</span>
+          </div>
+          <h2>{lessonTitle(l)}</h2>
+          <AyatText surah={l.surah} from={l.from} to={l.to} hidden={hide && plan.mode === 'new'} onReveal={() => setHide(false)} />
+
+          {plan.mode === 'new' && (
+            <>
+              <ol className="hifz-steps">
+                {STEPS.map((s) => (
+                  <li key={s.id}>
+                    <strong>{s.title}</strong>
+                    <small>{s.sub}</small>
+                  </li>
+                ))}
+              </ol>
+              <div className="rep-row">
+                <button
+                  className="rep-btn"
+                  onClick={async () => {
+                    await startLesson(l, today)
+                    await bumpReps(l, 1)
+                    navigator.vibrate?.(8)
+                  }}
+                >
+                  <span className="rep-count">{num(l.reps || 0)}</span>
+                  <span>تكرار — دوس مع كل مرة</span>
+                </button>
+                <span className="bar bar-thin">
+                  <span style={{ width: `${Math.min(1, (l.reps || 0) / 20) * 100}%` }} />
+                </span>
+              </div>
+              <div className="row">
+                <button className="btn btn-ghost" onClick={() => setHide(!hide)}>
+                  {hide ? 'اظهر النص' : 'خبّي النص وسمّع'}
+                </button>
+                <button
+                  className="btn"
+                  onClick={async () => {
+                    await markMemorized(l, today)
+                    setHide(false)
+                  }}
+                >
+                  <Icon name="check" size={18} />
+                  حفظتها
+                </button>
+              </div>
+            </>
+          )}
+
+          {plan.mode === 'doneToday' && (
+            <>
+              <p className="muted">تسميع النهارده عشان الحفظ يثبت:</p>
+              <ul className="tasks">
+                {SAME_DAY.map((s) => {
+                  const done = (l.sameDay || []).includes(s.id)
+                  return (
+                    <li key={s.id} className={`task ${done ? 'is-done' : ''}`}>
+                      <span className="task-title">
+                        {s.title}
+                        <small className="muted">{s.sub}</small>
+                      </span>
+                      <button
+                        className={`check ${done ? 'is-done' : ''}`}
+                        onClick={() => toggleSameDay(l, s.id)}
+                        aria-pressed={done}
+                        aria-label={s.title}
+                      >
+                        <Icon name="check" size={18} stroke={2.6} />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              {pace === 'everyOther' && <p className="muted">بكرة يوم تثبيت للآيات دي، والجديد بعد بكرة إن شاء الله.</p>}
+            </>
+          )}
         </section>
       )}
 
-      {groups
-        .filter((g) => g.list.length)
-        .map((g) => (
-          <section key={g.st} className="card">
-            <div className="row-between">
-              <h2>{HIFZ_STATUS[g.st].label}</h2>
-              <span className="pill">{num(g.list.length)}</span>
-            </div>
-            <ul className="habits">
-              {(g.st === 'memorized' && !showAllMem ? g.list.slice(0, 5) : g.list).map((r) => (
-                <li key={r.surah}>
-                  <HifzRow r={r} open={open === r.surah} onToggle={() => setOpen(open === r.surah ? null : r.surah)} />
-                </li>
-              ))}
-            </ul>
-            {g.st === 'memorized' && g.list.length > 5 && (
-              <button className="btn btn-ghost btn-wide" onClick={() => setShowAllMem(!showAllMem)}>
-                {showAllMem ? 'أقل' : `اعرض الـ ${num(g.list.length)} سورة`}
+      {l && (plan.mode === 'steady' || plan.mode === 'steadyDone') && (
+        <section className={`card hifz-lesson ${plan.mode === 'steadyDone' ? 'is-done' : ''}`}>
+          <span className="tasks-label">{plan.mode === 'steadyDone' ? 'التثبيت ✓' : 'يوم تثبيت'}</span>
+          <h2>{lessonTitle(l)}</h2>
+          <p className="muted">
+            مفيش جديد النهارده. سمّع اللي حفظته امبارح ٣ مرات متفرقة، واربطه باللي قبله، وصلّي بيه لو تقدر.
+          </p>
+          <AyatText surah={l.surah} from={l.from} to={l.to} hidden={hide} onReveal={() => setHide(false)} />
+          {plan.mode === 'steady' && (
+            <div className="row">
+              <button className="btn btn-ghost" onClick={() => setHide(!hide)}>
+                {hide ? 'اظهر النص' : 'خبّي النص وسمّع'}
               </button>
-            )}
-          </section>
-        ))}
+              <button className="btn" onClick={() => markSteady(l, today)}>
+                <Icon name="check" size={18} />
+                ثبّتها
+              </button>
+            </div>
+          )}
+          {plan.mode === 'steadyDone' && nextUp[0] && (
+            <p className="muted">الجديد بكرة: {lessonTitle(nextUp[0])}</p>
+          )}
+        </section>
+      )}
+
+      {!l && (
+        <section className="card">
+          <h2>ما شاء الله، ختمت الحفظ 🤍</h2>
+          <p className="muted">كمّل المراجعة بالجدول.</p>
+        </section>
+      )}
+
+      {/* ===== تسميع المراجعة ===== */}
+      <section className="card">
+        <div className="row-between">
+          <h2>تسميع المراجعة النهارده</h2>
+          <span className={`pill ${plan.due.length ? 'st-slipped' : 'pill-ok'}`}>
+            {plan.due.length ? `${num(plan.due.length)} عليك` : 'خلصت ✓'}
+          </span>
+        </div>
+        {plan.due.length === 0 && plan.reviewedToday.length === 0 && (
+          <p className="muted">مفيش مراجعة النهارده. كل جزء بتحفظه بيرجعلك بعد ١، ٣، ٧، ١٤، ٣٠، ٦٠ يوم.</p>
+        )}
+        <ul className="jobs">
+          {plan.due.map((r) => (
+            <li key={r.id} className="job">
+              <div className="row-between">
+                <span className="tl-text">
+                  <strong>{lessonTitle(r)}</strong>
+                  <small>
+                    مرحلة {num((r.intervalIdx || 0) + 1)} من {num(INTERVALS.length)}، حفظتها {formatShortDate(fromKey(r.memorizedAt))}
+                  </small>
+                </span>
+                <button className="link-btn" onClick={() => setOpenReview(openReview === r.id ? null : r.id)}>
+                  {openReview === r.id ? 'خبّي' : 'بُص'}
+                </button>
+              </div>
+              {openReview === r.id && <AyatText surah={r.surah} from={r.from} to={r.to} />}
+              <div className="row">
+                <button className="btn btn-small" onClick={() => review(r, true, today)}>
+                  سمّعتها صح ✓
+                </button>
+                <button className="btn btn-ghost btn-small" onClick={() => review(r, false, today)}>
+                  فيها غلطات
+                </button>
+              </div>
+            </li>
+          ))}
+          {plan.reviewedToday.map((r) => (
+            <li key={r.id} className="job is-done">
+              <span className="tl-text">
+                <strong>{lessonTitle(r)} ✓</strong>
+                <small>الجاية {formatShortDate(fromKey(r.nextReview))}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {upcoming.length > 0 && (
+        <section className="card">
+          <h2>مواعيد التسميع الجاية</h2>
+          <ul className="totals">
+            {upcoming.map((r) => (
+              <li key={r.id}>
+                <span>{lessonTitle(r)}</span>
+                <strong>{formatShortDate(fromKey(r.nextReview))}</strong>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {nextUp.length > 0 && (
+        <section className="card">
+          <h2>اللي جاي في الحفظ</h2>
+          <ul className="totals">
+            {nextUp.map((p) => (
+              <li key={p.id}>
+                <span>{lessonTitle(p)}</span>
+                <small className="muted">{SURAH[p.surah].type}</small>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card">
-        <h2>ضيف سورة</h2>
-        {rows.length === 0 && (
-          <p className="muted">ابدأ بالسور اللي حافظها، وبعدين اللي بتحفظ فيها أو سبتها في النص.</p>
-        )}
-        {adding || rows.length === 0 ? (
-          <form className="add-task" onSubmit={add}>
-            <select className="input" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="السورة">
-              <option value="">اختار السورة…</option>
-              {QURAN.surahs
-                .filter((s) => !have.has(s.n))
-                .map((s) => (
-                  <option key={s.n} value={s.n}>
-                    {num(s.n)}. {s.name} ({num(s.ayahs)} آية)
-                  </option>
-                ))}
-            </select>
-            <div className="seg" role="radiogroup" aria-label="الحالة">
-              {['memorized', 'learning', 'paused', 'todo'].map((st) => (
-                <button key={st} type="button" className={pickStatus === st ? 'is-on' : ''} onClick={() => setPickStatus(st)}>
-                  {HIFZ_STATUS[st].label.replace(' ✓', '')}
-                </button>
-              ))}
-            </div>
-            <div className="row">
-              <button className="btn" type="submit">
-                ضيف
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={() => addJuzAmma('memorized')}>
-                جزء عمّ كله حافظه
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button className="btn btn-ghost btn-wide" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={18} />
-            ضيف سورة
-          </button>
-        )}
+        <h2>الطريقة</h2>
+        <ul className="section-items">
+          <li>القليل الدائم أحسن من الكتير المنقطع: ٣ آيات بإتقان أحسن من صفحة بتطير.</li>
+          <li>احفظ بعد الفجر، وسمّع بعدها بساعة، وبعد الظهر أو العصر، وقبل النوم.</li>
+          <li>صلّي باللي حفظته في السنن والفرايض — أقوى تثبيت.</li>
+          <li>كل ما تخلص سورة، سمّعها كاملة من أولها لآخرها كذا مرة.</li>
+          <li>اقرأ بصوت مسموع، ومن نفس المصحف دايمًا.</li>
+        </ul>
+        <label className="field field-row">
+          <span>كل يوم بدل كل يومين</span>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={pace === 'daily'}
+            onChange={(e) => setSetting('hifzPace', e.target.checked ? 'daily' : 'everyOther')}
+          />
+        </label>
       </section>
     </>
-  )
-}
-
-function HifzRow({ r, open, onToggle }) {
-  const sm = SURAH[r.surah]
-  const reached = r.status === 'memorized' ? sm.ayahs : r.reached || 0
-  const p = reached / sm.ayahs
-  const st = HIFZ_STATUS[r.status]
-  const update = (patch) => db.hifz.update(r.surah, { ...patch, updatedAt: new Date().toISOString() })
-
-  return (
-    <div className="hifz">
-      <button className="row-between link-row" onClick={onToggle} aria-expanded={open}>
-        <span className="habit-name">
-          {sm.name} <small className="muted">({num(sm.ayahs)} آية)</small>
-        </span>
-        <span className={`pill ${st.cls}`}>{st.label}</span>
-      </button>
-      {r.status !== 'memorized' && (
-        <div className="habit-viz">
-          <span className="bar bar-thin">
-            <span style={{ width: `${p * 100}%` }} />
-          </span>
-          <small className="muted">
-            {reached ? `وصلت للآية ${num(reached)}` : 'لسه ما بدأتش'}
-          </small>
-        </div>
-      )}
-      {open && (
-        <div className="goal-edit">
-          {r.status !== 'memorized' && (
-            <div className="stepper">
-              <span>وصلت للآية</span>
-              <button className="icon-btn" onClick={() => update({ reached: Math.max(0, reached - 1) })} aria-label="أقل">
-                −
-              </button>
-              <input
-                className="input input-small"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                max={sm.ayahs}
-                value={reached}
-                onChange={(e) => update({ reached: Math.max(0, Math.min(sm.ayahs, Number(e.target.value) || 0)) })}
-              />
-              <button
-                className="icon-btn"
-                onClick={() => {
-                  const n = Math.min(sm.ayahs, reached + 3)
-                  update(n >= sm.ayahs ? { reached: n, status: 'memorized' } : { reached: n, status: 'learning' })
-                }}
-                aria-label="زوّد ٣ آيات"
-              >
-                +٣
-              </button>
-            </div>
-          )}
-          <div className="seg" role="radiogroup" aria-label="الحالة">
-            {['learning', 'paused', 'todo', 'memorized'].map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={r.status === s ? 'is-on' : ''}
-                onClick={() => update(s === 'memorized' ? { status: s, reached: sm.ayahs } : { status: s })}
-              >
-                {HIFZ_STATUS[s].label.replace(' ✓', '')}
-              </button>
-            ))}
-          </div>
-          {r.status !== 'memorized' && (
-            <div className="seg" role="radiogroup" aria-label="الأولوية">
-              {[
-                [1, 'أولًا'],
-                [2, 'عادي'],
-                [3, 'بعدين'],
-              ].map(([v, label]) => (
-                <button key={v} type="button" className={r.priority === v ? 'is-on' : ''} onClick={() => update({ priority: v })}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          <button
-            className="link-btn"
-            onClick={() => window.confirm(`تشيل سورة ${sm.name} من القايمة؟`) && db.hifz.delete(r.surah)}
-          >
-            شيلها من القايمة
-          </button>
-        </div>
-      )}
-    </div>
   )
 }

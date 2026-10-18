@@ -2,7 +2,8 @@ import Icon from '../components/Icon.jsx'
 
 const ITEMS = [
   { id: 'work', label: 'شغلي وحساباتي', sub: 'الطلبات، اللي سلّمته، الفلوس وعند مين', icon: 'wallet' },
-  { id: 'hifz', label: 'حفظ القرآن', sub: 'السور اللي حافظها وبتحفظ فيها', icon: 'book' },
+  { id: 'hifz', label: 'حفظ القرآن', sub: 'حفظ ٣ آيات، مواعيد التسميع والمراجعة', icon: 'book' },
+  { id: 'tasbih', label: 'السبحة', sub: 'عدّاد تسبيح حر', icon: 'beads' },
   { id: 'gym', label: 'جدول التمرين', sub: 'الأيام والمعاد والتمارين', icon: 'dumbbell' },
   { id: 'month', label: 'الشهر', sub: 'التقويم والتزامك ومهام كل شهر', icon: 'month' },
   { id: 'year', label: 'السنة', sub: 'التزامك شهر بشهر', icon: 'star' },
