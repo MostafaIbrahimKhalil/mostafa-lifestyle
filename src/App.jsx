@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db, setSetting, requestPersistentStorage } from './db.js'
+import { getSetting, requestPersistentStorage, seedDefaults, setSetting } from './db.js'
 import { ASPECTS } from './aspects.js'
+import { useSettings } from './hooks.js'
+import { todayKey } from './lib/dates.js'
 import Icon from './components/Icon.jsx'
-import Home from './screens/Home.jsx'
-import Sections from './screens/Sections.jsx'
+import Today from './screens/Today.jsx'
+import Month from './screens/Month.jsx'
+import Year from './screens/Year.jsx'
+import Tasbih from './screens/Tasbih.jsx'
 import Settings from './screens/Settings.jsx'
 
 const TABS = [
-  { id: 'home', label: 'اليوم', icon: 'home' },
-  { id: 'sections', label: 'الأقسام', icon: 'grid' },
+  { id: 'today', label: 'اليوم', icon: 'home' },
+  { id: 'month', label: 'الشهر', icon: 'month' },
+  { id: 'year', label: 'السنة', icon: 'star' },
+  { id: 'tasbih', label: 'التسبيح', icon: 'beads' },
   { id: 'settings', label: 'الإعدادات', icon: 'gear' },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState('home')
-  const nameRow = useLiveQuery(() => db.settings.get('name'), [])
-  const name = nameRow?.value ?? 'مصطفى'
+  const [tab, setTab] = useState('today')
+  const settings = useSettings()
 
   const {
     needRefresh: [needRefresh],
@@ -31,8 +35,17 @@ export default function App() {
 
   useEffect(() => {
     requestPersistentStorage()
-    setSetting('lastOpened', new Date().toISOString())
+    seedDefaults()
+    ;(async () => {
+      if (!(await getSetting('firstUse'))) await setSetting('firstUse', todayKey())
+      await setSetting('lastOpened', new Date().toISOString())
+    })()
   }, [])
+
+  function switchTab(id) {
+    setTab(id)
+    window.scrollTo({ top: 0 })
+  }
 
   return (
     <div className="app">
@@ -45,21 +58,25 @@ export default function App() {
         </div>
       )}
 
-      <main className="screen" key={tab}>
-        {tab === 'home' && <Home name={name} aspects={ASPECTS} onOpenSettings={() => setTab('settings')} />}
-        {tab === 'sections' && <Sections aspects={ASPECTS} />}
-        {tab === 'settings' && <Settings name={name} />}
-      </main>
+      {settings && (
+        <main className="screen" key={tab}>
+          {tab === 'today' && <Today settings={settings} aspects={ASPECTS} />}
+          {tab === 'month' && <Month settings={settings} />}
+          {tab === 'year' && <Year settings={settings} />}
+          {tab === 'tasbih' && <Tasbih settings={settings} />}
+          {tab === 'settings' && <Settings settings={settings} />}
+        </main>
+      )}
 
       <nav className="tabbar" aria-label="القوائم">
         {TABS.map((t) => (
           <button
             key={t.id}
             className={`tab ${tab === t.id ? 'is-active' : ''}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => switchTab(t.id)}
             aria-current={tab === t.id ? 'page' : undefined}
           >
-            <Icon name={t.icon} size={24} />
+            <Icon name={t.icon} size={23} />
             <span>{t.label}</span>
           </button>
         ))}

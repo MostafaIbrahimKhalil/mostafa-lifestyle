@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import Icon from '../components/Icon.jsx'
 import { exportBackup, importBackup, setSetting } from '../db.js'
-import { dateKey } from '../lib/dates.js'
+import { dateKey, num } from '../lib/dates.js'
+import { getDeviceLocation } from '../lib/prayer.js'
 import {
   isIOS,
   isStandalone,
@@ -10,8 +11,9 @@ import {
   sendTestNotification,
 } from '../lib/device.js'
 
-export default function Settings({ name }) {
-  const [draftName, setDraftName] = useState(name)
+export default function Settings({ settings }) {
+  const [draftName, setDraftName] = useState(settings.name)
+  const [locBusy, setLocBusy] = useState(false)
   const [notif, setNotif] = useState(notificationStatus())
   const [msg, setMsg] = useState(null)
   const fileRef = useRef(null)
@@ -28,6 +30,17 @@ export default function Settings({ name }) {
     if (!clean) return
     await setSetting('name', clean)
     flash('اتحفظ الاسم')
+  }
+
+  async function updateLocation() {
+    setLocBusy(true)
+    try {
+      await setSetting('location', await getDeviceLocation())
+      flash('اتحدد مكانك، والمواقيت اتظبطت عليه')
+    } catch (err) {
+      flash(err.message, 'warn')
+    }
+    setLocBusy(false)
   }
 
   async function enableAndTest() {
@@ -122,6 +135,70 @@ export default function Settings({ name }) {
             حفظ
           </button>
         </form>
+      </section>
+
+      <section className="card">
+        <h2>مكانك</h2>
+        <p className="muted">
+          المواقيت بحساب الهيئة المصرية العامة للمساحة على: <strong>{settings.location?.label}</strong>
+        </p>
+        <button className="btn btn-ghost btn-wide" onClick={updateLocation} disabled={locBusy}>
+          <Icon name="pin" size={20} />
+          {locBusy ? 'بنحدد…' : 'حدّث مكاني'}
+        </button>
+      </section>
+
+      <section className="card">
+        <h2>يومك</h2>
+        <label className="field field-row">
+          <span>بنام الساعة</span>
+          <input
+            className="input input-small"
+            type="time"
+            value={settings.sleepTime}
+            onChange={(e) => e.target.value && setSetting('sleepTime', e.target.value)}
+          />
+        </label>
+        <p className="muted">أسنان الليل قبلها بربع ساعة، وأذكار النوم في معادها. اليوم بيتقفل الساعة ٣ الفجر.</p>
+      </section>
+
+      <section className="card">
+        <h2>القرآن</h2>
+        <label className="field field-row">
+          <span>الجزء اللي عليه الدور</span>
+          <select
+            className="input input-small"
+            value={settings.wirdNext}
+            onChange={(e) => setSetting('wirdNext', Number(e.target.value))}
+          >
+            {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
+              <option key={j} value={j}>
+                {num(j)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field field-row">
+          <span>بقرا الورد</span>
+          <select
+            className="input input-small"
+            value={settings.wirdSlot}
+            onChange={(e) => setSetting('wirdSlot', e.target.value)}
+          >
+            <option value="fajr">بعد الفجر</option>
+            <option value="asr">بعد العصر</option>
+            <option value="isha">بعد العشاء</option>
+          </select>
+        </label>
+        <label className="field field-row">
+          <span>حفظ ٣ آيات كل يوم</span>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={settings.hifzEnabled !== false}
+            onChange={(e) => setSetting('hifzEnabled', e.target.checked)}
+          />
+        </label>
       </section>
 
       <section className="card">

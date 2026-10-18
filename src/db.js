@@ -11,6 +11,46 @@ db.version(1).stores({
   logs: '++id, date, type, [date+type]',
 })
 
+db.version(2).stores({
+  // علامات ✓ اليومية: id = `${date}|${item}` — مثلًا '2026-10-18|prayer:fajr'
+  // { id, date, item, value, at }
+  checks: 'id, date, item',
+  // المهام: kind = 'daily' (شغل ثابت كل يوم) | 'once' (حسب الظروف ليوم معيّن) | 'monthly'
+  // { id, kind, title, priority (1 مهم جدًا، 2 مهم، 3 عادي), date, done, doneAt, dayOfMonth, active, createdAt }
+  tasks: '++id, kind, date, done',
+  // عدّاد التسبيح الحر: id = `${date}|${phrase}` — { id, date, phrase, count }
+  tasbih: 'id, date',
+  // الأهداف: { id, title, targetDate, note, done, order }
+  goals: '++id, order',
+})
+
+// أهداف السنة المبدئية — بتتضاف مرة واحدة بس
+export async function seedDefaults() {
+  const seeded = await getSetting('seededGoals', false)
+  if (seeded) return
+  const count = await db.goals.count()
+  if (count === 0) {
+    await db.goals.bulkAdd([
+      { title: 'شهادة Goethe للألماني', targetDate: '', note: '', done: false, order: 1 },
+      { title: 'شهادة IELTS للإنجليزي', targetDate: '', note: '', done: false, order: 2 },
+      { title: 'التقديم لمنحة DW', targetDate: '', note: '', done: false, order: 3 },
+    ])
+  }
+  await setSetting('seededGoals', true)
+}
+
+// ===== علامات ✓ =====
+
+export function checkId(date, item) {
+  return `${date}|${item}`
+}
+
+export async function setCheck(date, item, done, value = true) {
+  const id = checkId(date, item)
+  if (done) await db.checks.put({ id, date, item, value, at: new Date().toISOString() })
+  else await db.checks.delete(id)
+}
+
 export async function getSetting(key, fallback = null) {
   const row = await db.settings.get(key)
   return row ? row.value : fallback
