@@ -23,3 +23,11 @@ export async function gymEveryDay() {
   }
   await setSetting('gymEveryDay', true)
 }
+
+// إشعار واحد لكل صلاة: نقفل تنبيه "قبل الأذان" مرة واحدة
+export async function onePrayerNotification() {
+  if (await getSetting('onePrayerNotif', false)) return
+  const notify = (await getSetting('notify', null)) || {}
+  await setSetting('notify', { ...notify, prayerBefore: false })
+  await setSetting('onePrayerNotif', true)
+}
