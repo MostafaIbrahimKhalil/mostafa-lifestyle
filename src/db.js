@@ -24,6 +24,26 @@ db.version(2).stores({
   goals: '++id, order',
 })
 
+db.version(3)
+  .stores({
+    // تمرين يوم: { id, date, routine, sets: { [exId]: [{w, r, done}] }, cardio: { kind, minutes, done }, done }
+    workouts: '++id, date, routine',
+    // وزن الجسم: { date, kg }
+    body: 'date',
+    // حفظ القرآن لكل سورة: { surah, status: 'memorized'|'learning'|'paused'|'todo', reached, priority, updatedAt }
+    hifz: 'surah, status',
+  })
+  .upgrade(async (tx) => {
+    // الأهداف بقت ليها حالة وأولوية
+    await tx
+      .table('goals')
+      .toCollection()
+      .modify((g) => {
+        if (!g.status) g.status = g.done ? 'done' : 'active'
+        if (!g.priority) g.priority = 2
+      })
+  })
+
 // أهداف السنة المبدئية — بتتضاف مرة واحدة بس
 export async function seedDefaults() {
   const seeded = await getSetting('seededGoals', false)
@@ -31,9 +51,9 @@ export async function seedDefaults() {
   const count = await db.goals.count()
   if (count === 0) {
     await db.goals.bulkAdd([
-      { title: 'شهادة Goethe للألماني', targetDate: '', note: '', done: false, order: 1 },
-      { title: 'شهادة IELTS للإنجليزي', targetDate: '', note: '', done: false, order: 2 },
-      { title: 'التقديم لمنحة DW', targetDate: '', note: '', done: false, order: 3 },
+      { title: 'شهادة Goethe للألماني', targetDate: '', note: '', done: false, status: 'active', priority: 2, steps: [], order: 1 },
+      { title: 'شهادة IELTS للإنجليزي', targetDate: '', note: '', done: false, status: 'active', priority: 2, steps: [], order: 2 },
+      { title: 'التقديم لمنحة DW', targetDate: '', note: '', done: false, status: 'active', priority: 2, steps: [], order: 3 },
     ])
   }
   await setSetting('seededGoals', true)

@@ -23,8 +23,12 @@ import {
 } from '../lib/dates.js'
 import { isIOS, isStandalone } from '../lib/device.js'
 import { getDeviceLocation } from '../lib/prayer.js'
+import { MEALS, WATER_TARGET } from '../lib/day.js'
+import QuranReader from './QuranReader.jsx'
+import AdhkarReader from './AdhkarReader.jsx'
+import Workout from './Workout.jsx'
 
-export default function Today({ settings, aspects, onOpenTasks }) {
+export default function Today({ settings, aspects, onOpenTasks, onOpenHifz }) {
   const realNow = useNow()
   const [offset, setOffset] = useState(0) // ٠ = النهارده، -١ = امبارح (لو نسيت تعلّم)
   const isToday = offset === 0
@@ -34,6 +38,7 @@ export default function Today({ settings, aspects, onOpenTasks }) {
   const now = isToday ? realNow : addDays(day, 1)
   const [tasbihFor, setTasbihFor] = useState(null)
   const [locMsg, setLocMsg] = useState(null)
+  const [overlay, setOverlay] = useState(null) // { kind: 'quran'|'adhkar'|'gym', ... }
 
   const checks = useLiveQuery(() => db.checks.where('date').equals(today).toArray(), [today])
   const allTasks = useLiveQuery(() => db.tasks.toArray(), [])
@@ -45,7 +50,7 @@ export default function Today({ settings, aspects, onOpenTasks }) {
 
   const workTotal = g.daily.length + g.today.length
   const workDone = g.daily.filter((t) => checkedSet.has(`task:${t.id}`)).length + g.today.filter((t) => t.done).length
-  const progress = progressFor(checkedSet, settings, workTotal, workDone)
+  const progress = progressFor(checkedSet, settings, workTotal, workDone, day)
   const curPrayer = isToday ? currentPrayer(times, now) : null
   const excused = checkedSet.has('day:excused')
 
@@ -159,12 +164,19 @@ export default function Today({ settings, aspects, onOpenTasks }) {
           if (r.type === 'wird') {
             const c = checked.get('wird')
             const juz = c ? c.value : settings.wirdNext || 1
+            const pos = !c && settings.wirdPos?.juz === juz ? settings.wirdPos : null
             return (
               <CheckRow
                 key={r.id}
-                row={{ ...r, title: `الورد: الجزء ${num(juz)}`, subtitle: 'جزء في اليوم' }}
+                row={{
+                  ...r,
+                  title: `الورد: الجزء ${num(juz)}`,
+                  subtitle: c ? 'قريته ✓' : pos ? 'كمّل من مكان ما وقفت' : 'دوس عشان تقرا',
+                }}
                 done={!!c}
                 onToggle={(d) => toggleWird(juz, d)}
+                onOpen={() => setOverlay({ kind: 'quran', juz })}
+                openLabel={pos ? 'كمّل' : 'اقرا'}
               />
             )
           }
@@ -174,6 +186,45 @@ export default function Today({ settings, aspects, onOpenTasks }) {
               <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
             )
           }
+          if (r.type === 'food') return <FoodBlock key={r.id} checkedSet={checkedSet} checked={checked} today={today} />
+          if (r.type === 'gym') {
+            const done = checkedSet.has('gym')
+            const label = r.routine.exercises.length ? `${num(r.routine.exercises.length)} تمارين + كارديو ${num(r.routine.cardio)} دقيقة` : `مشي ${num(r.routine.walk)} دقيقة`
+            return (
+              <CheckRow
+                key={r.id}
+                row={{ ...r, subtitle: r.routine.optional ? `${label} · اختياري` : label }}
+                done={done}
+                onToggle={(d) => toggle('gym', d, r.routine.id)}
+                onOpen={() => setOverlay({ kind: 'gym', routine: r.routine })}
+                openLabel="ابدأ"
+              />
+            )
+          }
+          if (r.id.startsWith('adhkar:')) {
+            const kind = r.id.split(':')[1]
+            return (
+              <CheckRow
+                key={r.id}
+                row={r}
+                done={checkedSet.has(r.id)}
+                onToggle={(d) => toggle(r.id, d)}
+                onOpen={() => setOverlay({ kind: 'adhkar', adhkar: kind })}
+                openLabel="اقرا"
+              />
+            )
+          }
+          if (r.id === 'hifz')
+            return (
+              <CheckRow
+                key={r.id}
+                row={r}
+                done={checkedSet.has(r.id)}
+                onToggle={(d) => toggle(r.id, d)}
+                onOpen={onOpenHifz}
+                openLabel="تقدّمي"
+              />
+            )
           return <CheckRow key={r.id} row={r} done={checkedSet.has(r.id)} onToggle={(d) => toggle(r.id, d)} />
         })}
       </ol>
@@ -195,6 +246,14 @@ export default function Today({ settings, aspects, onOpenTasks }) {
           </small>
         </span>
       </button>
+
+      {overlay?.kind === 'quran' && (
+        <QuranReader juz={overlay.juz} today={today} settings={settings} onClose={() => setOverlay(null)} />
+      )}
+      {overlay?.kind === 'adhkar' && (
+        <AdhkarReader kind={overlay.adhkar} today={today} onClose={() => setOverlay(null)} />
+      )}
+      {overlay?.kind === 'gym' && <Workout routine={overlay.routine} today={today} onClose={() => setOverlay(null)} />}
 
       {tasbihFor && (
         <TasbihSheet
@@ -258,8 +317,8 @@ function PrayerRow({ row, now, isCurrent, done, state, onState, tasbihDone, onTo
   )
 }
 
-function CheckRow({ row, done, onToggle }) {
-  const aspect = row.id.startsWith('teeth') ? 'health' : 'faith'
+function CheckRow({ row, done, onToggle, onOpen, openLabel }) {
+  const aspect = row.id.startsWith('teeth') || row.id === 'gym' ? 'health' : 'faith'
   return (
     <li className={`tl-item ${done ? 'is-done' : ''}`}>
       <span className="tl-time">{row.hideTime ? '' : formatTime(row.time)}</span>
@@ -268,11 +327,91 @@ function CheckRow({ row, done, onToggle }) {
           <span className={`tl-icon tl-icon-${aspect}`}>
             <Icon name={row.icon} size={18} />
           </span>
-          <div className="tl-text">
-            <strong>{row.title}</strong>
-            {row.subtitle && <small>{row.subtitle}</small>}
-          </div>
+          {onOpen ? (
+            <button className="tl-text link-row tl-open" onClick={onOpen}>
+              <strong>{row.title}</strong>
+              {row.subtitle && <small>{row.subtitle}</small>}
+            </button>
+          ) : (
+            <div className="tl-text">
+              <strong>{row.title}</strong>
+              {row.subtitle && <small>{row.subtitle}</small>}
+            </div>
+          )}
+          {onOpen && !done && (
+            <button className="open-btn" onClick={onOpen}>
+              {openLabel}
+            </button>
+          )}
           <CheckButton done={done} onToggle={onToggle} label={row.title} />
+        </div>
+      </div>
+    </li>
+  )
+}
+
+function FoodBlock({ checkedSet, checked, today }) {
+  const water = checked.get('water:count')?.value || 0
+
+  async function addWater(delta) {
+    const next = Math.max(0, Math.min(20, water + delta))
+    await setCheck(today, 'water:count', next > 0, next)
+    await setCheck(today, 'water', next >= WATER_TARGET, next)
+  }
+
+  return (
+    <li className="tl-item tl-work">
+      <span className="tl-time" />
+      <div className="tl-body">
+        <div className="tl-main">
+          <span className="tl-icon tl-icon-health">
+            <Icon name="plate" size={18} />
+          </span>
+          <div className="tl-text">
+            <strong>الأكل والمية</strong>
+            <small>نص الطبق خضار، ربعه بروتين، ربعه نشويات</small>
+          </div>
+        </div>
+        <ul className="tasks">
+          {MEALS.map((m) => (
+            <li key={m.id} className={`task ${checkedSet.has(m.id) ? 'is-done' : ''}`}>
+              <span className="task-title">
+                {m.name}
+                <small className="muted">على الطبق المظبوط وفيه بروتين</small>
+              </span>
+              <CheckButton done={checkedSet.has(m.id)} onToggle={(d) => setCheck(today, m.id, d)} label={m.name} />
+            </li>
+          ))}
+          <li className={`task ${checkedSet.has('clean') ? 'is-done' : ''}`}>
+            <span className="task-title">
+              من غير حاجات تزوّد
+              <small className="muted">ساقع، عصير، حلويات، مقليات، أكل بالليل</small>
+            </span>
+            <CheckButton done={checkedSet.has('clean')} onToggle={(d) => setCheck(today, 'clean', d)} label="من غير حاجات تزوّد" />
+          </li>
+        </ul>
+        <div className="water">
+          <div className="row-between">
+            <span>
+              المية: <strong>{num(water)}</strong> من {num(WATER_TARGET)} كوباية
+            </span>
+            <small className="muted">{num(((water * 250) / 1000).toFixed(2).replace(/\.?0+$/, ''))} لتر</small>
+          </div>
+          <div className="water-cups" aria-hidden="true">
+            {Array.from({ length: WATER_TARGET }, (_, i) => (
+              <span key={i} className={`cup ${i < water ? 'on' : ''}`} />
+            ))}
+          </div>
+          <div className="row">
+            <button className="btn" onClick={() => addWater(1)}>
+              + كوباية
+            </button>
+            {water > 0 && (
+              <button className="btn btn-ghost" onClick={() => addWater(-1)}>
+                −
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </li>

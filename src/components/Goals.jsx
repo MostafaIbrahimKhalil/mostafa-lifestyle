@@ -2,7 +2,13 @@ import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { db } from '../db.js'
 import { formatShortDate, fromKey, num } from '../lib/dates.js'
-import { daysLeft, goalProgress } from '../lib/goals.js'
+import { GOAL_STATUS, daysLeft, goalProgress, sortGoals } from '../lib/goals.js'
+
+const PRIO = [
+  [1, 'مهم جدًا'],
+  [2, 'مهم'],
+  [3, 'عادي'],
+]
 
 export default function Goals({ goals }) {
   const [open, setOpen] = useState(null)
@@ -12,16 +18,38 @@ export default function Goals({ goals }) {
     e.preventDefault()
     const clean = newTitle.trim()
     if (!clean) return
-    await db.goals.add({ title: clean, targetDate: '', note: '', done: false, steps: [], order: goals.length + 1 })
+    await db.goals.add({
+      title: clean,
+      targetDate: '',
+      note: '',
+      done: false,
+      status: 'active',
+      priority: 2,
+      steps: [],
+      order: goals.length + 1,
+    })
     setNewTitle('')
   }
 
+  const sorted = sortGoals(goals)
+  const first = sorted.find((g) => (g.status || 'active') === 'active')
+  const paused = sorted.filter((g) => g.status === 'paused')
+
   return (
     <section className="card">
-      <h2>أهدافي</h2>
+      <div className="row-between">
+        <h2>أهدافي ومشاريعي</h2>
+        {paused.length > 0 && <span className="pill st-slipped">{num(paused.length)} متوقفة</span>}
+      </div>
       <ul className="goals">
-        {goals.map((g) => (
-          <GoalItem key={g.id} g={g} open={open === g.id} onToggle={() => setOpen(open === g.id ? null : g.id)} />
+        {sorted.map((g) => (
+          <GoalItem
+            key={g.id}
+            g={g}
+            isFirst={g === first}
+            open={open === g.id}
+            onToggle={() => setOpen(open === g.id ? null : g.id)}
+          />
         ))}
       </ul>
       <form className="row" onSubmit={addGoal}>
@@ -40,7 +68,8 @@ export default function Goals({ goals }) {
   )
 }
 
-function GoalItem({ g, open, onToggle }) {
+function GoalItem({ g, open, onToggle, isFirst }) {
+  const status = g.status || (g.done ? 'done' : 'active')
   const [step, setStep] = useState('')
   const steps = g.steps || []
   const p = goalProgress(g)
@@ -65,15 +94,17 @@ function GoalItem({ g, open, onToggle }) {
   }
 
   let sub
-  if (g.done) sub = 'اتحقق ✓'
+  if (status === 'done') sub = 'اتحقق ✓'
+  else if (status === 'paused') sub = 'بدأته وسبته'
   else if (g.targetDate) sub = `${formatShortDate(fromKey(g.targetDate))} · ${left >= 0 ? `باقي ${num(left)} يوم` : 'المعاد عدّى'}`
   else sub = 'لسه ما حددتش معاد'
 
   return (
-    <li className={`goal ${g.done ? 'is-done' : ''}`}>
+    <li className={`goal ${status === 'done' ? 'is-done' : ''} ${status === 'paused' ? 'is-paused' : ''} ${isFirst ? 'is-first' : ''}`}>
+      {isFirst && <span className="first-tag">ابدأ بده الأول</span>}
       <button className="goal-top link-row" onClick={onToggle} aria-expanded={open}>
         <span className="goal-icon">
-          <Icon name={g.done ? 'check' : 'star'} size={18} />
+          <Icon name={status === 'done' ? 'check' : 'star'} size={18} />
         </span>
         <span className="tl-text">
           <strong>{g.title}</strong>
@@ -87,11 +118,37 @@ function GoalItem({ g, open, onToggle }) {
       {!open && steps.length > 0 && (
         <small className="muted goal-steps-sum">
           {num(doneSteps)} من {num(steps.length)} خطوات
-          {!g.done && steps.find((s) => !s.done) && ` · الجاية: ${steps.find((s) => !s.done).title}`}
+          {status !== 'done' && steps.find((s) => !s.done) && ` · الجاية: ${steps.find((s) => !s.done).title}`}
         </small>
       )}
       {open && (
         <div className="goal-edit">
+          <div className="seg" role="radiogroup" aria-label="الحالة">
+            {Object.entries(GOAL_STATUS).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={status === id ? 'is-on' : ''}
+                onClick={() => db.goals.update(g.id, { status: id, done: id === 'done' })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {status !== 'done' && (
+            <div className="seg" role="radiogroup" aria-label="الأولوية">
+              {PRIO.map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={(g.priority || 2) === v ? 'is-on' : ''}
+                  onClick={() => db.goals.update(g.id, { priority: v })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <ul className="tasks">
             {steps.map((s) => (
               <li key={s.id} className={`task ${s.done ? 'is-done' : ''}`}>
@@ -145,9 +202,6 @@ function GoalItem({ g, open, onToggle }) {
             />
           </label>
           <div className="row">
-            <button className="btn" onClick={() => db.goals.update(g.id, { done: !g.done })}>
-              {g.done ? 'رجّعه لسه' : 'اتحقق ✓'}
-            </button>
             <button
               className="btn btn-ghost"
               onClick={() => window.confirm(`تمسح "${g.title}"؟`) && db.goals.delete(g.id)}

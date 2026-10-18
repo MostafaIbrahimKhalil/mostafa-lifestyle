@@ -1,6 +1,8 @@
 import Icon from '../components/Icon.jsx'
 
 const ITEMS = [
+  { id: 'hifz', label: 'حفظ القرآن', sub: 'السور اللي حافظها وبتحفظ فيها', icon: 'book' },
+  { id: 'gym', label: 'جدول التمرين', sub: 'الأيام والمعاد والتمارين', icon: 'dumbbell' },
   { id: 'month', label: 'الشهر', sub: 'التقويم والتزامك ومهام كل شهر', icon: 'month' },
   { id: 'year', label: 'السنة', sub: 'التزامك شهر بشهر', icon: 'star' },
   { id: 'settings', label: 'الإعدادات', sub: 'المكان، النوم، الورد، النسخة الاحتياطية', icon: 'gear' },

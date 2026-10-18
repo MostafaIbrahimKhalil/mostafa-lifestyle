@@ -2,12 +2,16 @@ import { trackedItemIds } from './day.js'
 import { addDays, dateKey, fromKey, todayKey } from './dates.js'
 
 export const CATEGORIES = [
-  { id: 'prayer', name: 'الصلاة', perDay: 5 },
-  { id: 'tasbih', name: 'التسبيح بعد الصلاة', perDay: 5 },
-  { id: 'adhkar', name: 'الأذكار', perDay: 3 },
-  { id: 'teeth', name: 'الأسنان', perDay: 2 },
-  { id: 'wird', name: 'الورد', perDay: 1 },
-  { id: 'hifz', name: 'الحفظ', perDay: 1 },
+  { id: 'prayer', name: 'الصلاة' },
+  { id: 'tasbih', name: 'التسبيح بعد الصلاة' },
+  { id: 'adhkar', name: 'الأذكار' },
+  { id: 'wird', name: 'الورد' },
+  { id: 'hifz', name: 'الحفظ' },
+  { id: 'teeth', name: 'الأسنان' },
+  { id: 'gym', name: 'الجيم' },
+  { id: 'meal', name: 'وجبات على الطبق' },
+  { id: 'water', name: 'المية' },
+  { id: 'clean', name: 'يوم من غير حاجات تزوّد' },
 ]
 
 const catOf = (item) => item.split(':')[0]
@@ -24,29 +28,39 @@ export function countedDays(fromKeyStr, toKeyStr, firstUse) {
 }
 
 export function summarize(checks, days, settings) {
-  const tracked = new Set(trackedItemIds(settings))
-  const dayset = new Set(days)
+  // كل يوم ليه البنود بتاعته (أيام الجيم مختلفة)
+  const trackedByDay = new Map(days.map((k) => [k, new Set(trackedItemIds(settings, fromKey(k)))]))
   const perDay = {}
+  const perDayTotals = {}
   const cats = {}
-  for (const c of CATEGORIES) cats[c.id] = 0
+  const expected = {}
+  for (const c of CATEGORIES) {
+    cats[c.id] = 0
+    expected[c.id] = 0
+  }
+  for (const [k, set] of trackedByDay) {
+    perDayTotals[k] = set.size
+    for (const item of set) expected[catOf(item)] = (expected[catOf(item)] || 0) + 1
+  }
   for (const c of checks) {
-    if (!dayset.has(c.date) || !tracked.has(c.item)) continue
+    const set = trackedByDay.get(c.date)
+    if (!set || !set.has(c.item)) continue
     perDay[c.date] = (perDay[c.date] || 0) + 1
     cats[catOf(c.item)] = (cats[catOf(c.item)] || 0) + 1
   }
-  const perDayTotal = tracked.size
   const doneAll = Object.values(perDay).reduce((s, n) => s + n, 0)
-  const expected = days.length * perDayTotal
+  const expectedAll = Object.values(perDayTotals).reduce((s, n) => s + n, 0)
   return {
     days: days.length,
     perDay, // date -> عدد البنود اللي اتعملت
-    perDayTotal,
+    perDayTotals,
+    perDayTotal: days.length ? Math.round(expectedAll / days.length) : 0,
     cats,
-    ratio: expected ? doneAll / expected : 0,
-    categories: CATEGORIES.filter((c) => c.id !== 'hifz' || settings.hifzEnabled !== false).map((c) => ({
+    ratio: expectedAll ? doneAll / expectedAll : 0,
+    categories: CATEGORIES.filter((c) => expected[c.id] > 0).map((c) => ({
       ...c,
       done: cats[c.id] || 0,
-      expected: days.length * c.perDay,
+      expected: expected[c.id],
     })),
   }
 }

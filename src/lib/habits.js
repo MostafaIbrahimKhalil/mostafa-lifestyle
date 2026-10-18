@@ -1,4 +1,6 @@
 import { PRAYERS } from './prayer.js'
+import { gymWeekdays } from './workout.js'
+import { MEALS } from './day.js'
 import { addDays, dateKey, fromKey, todayKey } from './dates.js'
 
 // العادة بتتحسب "اتكونت" بعد ٦٦ يوم متتالي
@@ -22,7 +24,16 @@ export function habitDefs(settings, tasks) {
   defs.push(
     { id: 'teeth:am', name: 'أسنان الصبح', aspect: 'health', group: 'الصحة' },
     { id: 'teeth:pm', name: 'أسنان قبل النوم', aspect: 'health', group: 'الصحة' },
+    // الجيم بيتحسب في أيامه بس، وباقي الأيام مش بتكسر السلسلة
+    { id: 'gym', name: 'الجيم', aspect: 'health', group: 'الصحة', days: gymWeekdays(settings) },
   )
+  if (settings.foodEnabled !== false) {
+    defs.push(
+      { id: 'plate', name: 'الأكل على الطبق المظبوط', aspect: 'health', group: 'الأكل', needs: MEALS.map((m) => m.id) },
+      { id: 'water', name: '٣ لتر مية', aspect: 'health', group: 'الأكل' },
+      { id: 'clean', name: 'من غير حاجات تزوّد', aspect: 'health', group: 'الأكل' },
+    )
+  }
   for (const t of tasks.filter((t) => t.kind === 'daily' && t.active !== false)) {
     defs.push({
       id: `task:${t.id}`,
@@ -60,6 +71,7 @@ export function habitStats(def, byDate, firstUse, now = new Date()) {
   // كل يوم: 'done' اتعمل، 'skip' يوم عذر (ما بيكسرش ولا بيزوّد)، 'miss' فات
   const states = days.map((k) => {
     const set = byDate.get(k)
+    if (def.days && !def.days.includes(fromKey(k).getDay())) return 'skip'
     if (isDone(def, set)) return 'done'
     if (!def.noSkip && set?.has('day:excused')) return 'skip'
     return 'miss'

@@ -73,7 +73,7 @@ export default function Month({ settings }) {
             if (!d) return <span key={`e${i}`} />
             const key = `${mk}-${String(d).padStart(2, '0')}`
             const has = counted.has(key)
-            const r = has ? (s.perDay[key] || 0) / s.perDayTotal : null
+            const r = has ? (s.perDay[key] || 0) / (s.perDayTotals[key] || 1) : null
             return (
               <button
                 key={key}

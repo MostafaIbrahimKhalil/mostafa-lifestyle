@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Goals from '../components/Goals.jsx'
+import BodyWeight from '../components/BodyWeight.jsx'
+import { SURAH, hifzSummary, nextHifz } from '../lib/hifz.js'
 import { daysLeft, goalProgress } from '../lib/goals.js'
 import Icon from '../components/Icon.jsx'
 import { db } from '../db.js'
@@ -11,11 +13,12 @@ const ASPECT_NAMES = { faith: 'العبادة', health: 'الصحة', work: 'ا�
 const ASPECT_COLORS = { faith: 'var(--c-faith)', health: 'var(--c-health)', work: 'var(--c-work)' }
 const pct = (r) => (r === null || r === undefined ? '—' : `${num(Math.round(r * 100))}٪`)
 
-export default function Progress({ settings }) {
+export default function Progress({ settings, onOpenHifz }) {
   const today = todayKey()
   const checks = useLiveQuery(() => db.checks.toArray(), [])
   const tasks = useLiveQuery(() => db.tasks.toArray(), [])
   const goals = useLiveQuery(() => db.goals.orderBy('order').toArray(), [])
+  const hifz = useLiveQuery(() => db.hifz.toArray(), [])
   const [showAll, setShowAll] = useState(false)
 
   const data = useMemo(() => {
@@ -33,7 +36,9 @@ export default function Progress({ settings }) {
     return { habits, prayerMix, balance: balanceFor(habits, tasks, today) }
   }, [checks, tasks, settings, today])
 
-  if (!data || !goals) return null
+  if (!data || !goals || !hifz) return null
+  const hs = hifzSummary(hifz)
+  const hn = nextHifz(hifz)
   const { habits, balance, prayerMix } = data
   const prayerTotal = Object.values(prayerMix).reduce((a, b) => a + b, 0)
   const formed = habits.filter((h) => h.status === 'formed').length
@@ -88,6 +93,23 @@ export default function Progress({ settings }) {
       </section>
 
       <Goals goals={goals} />
+
+      <button className="card card-action hifz-card" onClick={onOpenHifz}>
+        <span className="card-icon">
+          <Icon name="book" />
+        </span>
+        <span>
+          <strong>حفظ القرآن: {num((Math.round(hs.ratio * 1000) / 10).toFixed(1))}٪</strong>
+          <small>
+            {hifz.length
+              ? `${num(hs.memorized)} سورة حافظها${hn ? ` · كمّل ${SURAH[hn.surah].name}` : ''}`
+              : 'سجّل السور اللي حافظها وبتحفظ فيها'}
+          </small>
+        </span>
+        <Icon name="chevronLeft" size={18} />
+      </button>
+
+      <BodyWeight settings={settings} />
 
       <section className="card">
         <h2>توازني</h2>
@@ -226,7 +248,10 @@ function buildInsights(habits, goals, balance) {
   if (slipped && !weak.includes(slipped)) {
     out.push({ kind: 'habit', title: slipped.name, text: `كانت متكونة (${num(slipped.best)} يوم) ووقعت، رجّعها النهارده` })
   }
-  for (const g of goals.filter((g) => !g.done)) {
+  for (const g of goals.filter((g) => g.status === 'paused').slice(0, 2)) {
+    out.push({ kind: 'goal', title: g.title, text: 'بدأته وسبته — تكمّله ولا تشيله؟' })
+  }
+  for (const g of goals.filter((g) => !g.done && g.status !== 'paused' && g.status !== 'done')) {
     const left = daysLeft(g)
     const p = goalProgress(g)
     if (!g.targetDate) {

@@ -13,6 +13,8 @@ import Month from './screens/Month.jsx'
 import Year from './screens/Year.jsx'
 import Tasbih from './screens/Tasbih.jsx'
 import Settings from './screens/Settings.jsx'
+import Hifz from './screens/Hifz.jsx'
+import GymPlan from './screens/GymPlan.jsx'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
@@ -52,6 +54,12 @@ export default function App() {
     window.scrollTo({ top: 0 })
   }
 
+  function openHifz() {
+    setTab('more')
+    setSub('hifz')
+    window.scrollTo({ top: 0 })
+  }
+
   function openSub(id) {
     setSub(id)
     window.scrollTo({ top: 0 })
@@ -70,9 +78,14 @@ export default function App() {
 
       {settings && (
         <main className="screen" key={`${tab}-${sub}`}>
-          {tab === 'today' && <Today settings={settings} aspects={ASPECTS} onOpenTasks={() => switchTab('tasks')} />}
+          {tab === 'today' && <Today
+              settings={settings}
+              aspects={ASPECTS}
+              onOpenTasks={() => switchTab('tasks')}
+              onOpenHifz={openHifz}
+            />}
           {tab === 'tasks' && <Tasks />}
-          {tab === 'progress' && <Progress settings={settings} />}
+          {tab === 'progress' && <Progress settings={settings} onOpenHifz={openHifz} />}
           {tab === 'tasbih' && <Tasbih settings={settings} />}
           {tab === 'more' && sub && (
             <button className="back-btn" onClick={() => setSub(null)}>
@@ -83,6 +96,8 @@ export default function App() {
           {tab === 'more' && sub === 'month' && <Month settings={settings} />}
           {tab === 'more' && sub === 'year' && <Year settings={settings} />}
           {tab === 'more' && sub === 'settings' && <Settings settings={settings} />}
+          {tab === 'more' && sub === 'hifz' && <Hifz />}
+          {tab === 'more' && sub === 'gym' && <GymPlan settings={settings} />}
         </main>
       )}
 
