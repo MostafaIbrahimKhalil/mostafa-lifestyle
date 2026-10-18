@@ -121,3 +121,77 @@ export function monthFlow(mk, txns) {
 export async function addTxn(t) {
   return db.txns.add({ date: todayKey(), month: monthKey(new Date()), ...t, createdAt: new Date().toISOString() })
 }
+
+// ===== ميزانية الشهر =====
+// الالتزامات نوعين: ثابت (إيجار، نت، اشتراك) وفاتورة بتتغير (كهربا، مية، غاز)
+export const OBLIGATION_KINDS = { fixed: 'ثابت', bill: 'فاتورة بتتغير' }
+const BUDGET_DEFAULT_OBLIGATIONS = [
+  { name: 'الإيجار', kind: 'fixed', category: 'فواتير واشتراكات', dueDay: 1 },
+  { name: 'النت', kind: 'fixed', category: 'فواتير واشتراكات', dueDay: 5 },
+  { name: 'اشتراكات (أدوبي، Claude…)', kind: 'fixed', category: 'شغل وأدوات', dueDay: 1 },
+  { name: 'الكهربا', kind: 'bill', category: 'فواتير واشتراكات', dueDay: 10 },
+  { name: 'المية', kind: 'bill', category: 'فواتير واشتراكات', dueDay: 10 },
+  { name: 'الغاز', kind: 'bill', category: 'فواتير واشتراكات', dueDay: 10 },
+  { name: 'كروت الموبايل', kind: 'bill', category: 'فواتير واشتراكات', dueDay: 1 },
+]
+// البنود اللي ليها حد شهري
+export const LIMIT_CATS = ['أكل وبيت', 'مواصلات', 'شخصي', 'مدرسة وعيال', 'صحة', 'لبس', 'هدايا ومناسبات']
+
+export async function seedBudget() {
+  if (await getSetting('seededBudget', false)) return
+  await db.transaction('rw', db.obligations, db.settings, async () => {
+    if (await getSetting('seededBudget', false)) return
+    const existing = await db.obligations.toArray()
+    for (const o of BUDGET_DEFAULT_OBLIGATIONS) {
+      if (existing.some((x) => x.name === o.name)) continue
+      await db.obligations.add({ ...o, amount: 0, active: true })
+    }
+    await setSetting('seededBudget', true)
+  })
+}
+
+// صرف كل بند في شهر معيّن
+export function spendByCat(mk, txns) {
+  const out = {}
+  for (const t of txns) if (t.type === 'expense' && t.date?.startsWith(mk)) out[t.category || 'تانية'] = (out[t.category || 'تانية'] || 0) + (Number(t.amount) || 0)
+  return out
+}
+
+// اقتراح حد لكل بند = متوسط آخر ٣ شهور كاملة فيها صرف (مقرّب لأقرب ١٠٠)
+export function suggestLimits(txns, now = new Date()) {
+  const months = []
+  for (let i = 1; i <= 3; i++) months.push(monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)))
+  const used = months.filter((m) => txns.some((t) => t.type === 'expense' && t.date?.startsWith(m)))
+  // لو مفيش شهر كامل لسه، ناخد الشهر الحالي ونكمّله لآخر الشهر
+  const cur = monthKey(now)
+  const out = {}
+  if (!used.length) {
+    const s = spendByCat(cur, txns)
+    const day = now.getDate()
+    const dim = daysInMonth(now.getFullYear(), now.getMonth())
+    if (day < 10) return { limits: {}, basis: 'none' }
+    for (const [c, v] of Object.entries(s)) out[c] = Math.ceil(((v / day) * dim) / 100) * 100
+    return { limits: out, basis: 'current' }
+  }
+  for (const m of used) for (const [c, v] of Object.entries(spendByCat(m, txns))) out[c] = (out[c] || 0) + v / used.length
+  for (const c of Object.keys(out)) out[c] = Math.ceil(out[c] / 100) * 100
+  return { limits: out, basis: `${used.length}` }
+}
+
+// ملخص الشهر: المتوقع يدخل، والثابت والفواتير، والحدود، والمفروض يفضل
+export function budgetSummary({ mk, txns, obligations, limits, expectedIncome }) {
+  const obls = obligationsFor(mk, obligations, txns)
+  const oblTotal = obls.reduce((s, o) => s + (o.paid ? Number(o.paidTx.amount) || 0 : Number(o.amount) || 0), 0)
+  const limitTotal = Object.values(limits || {}).reduce((s, v) => s + (Number(v) || 0), 0)
+  const spent = spendByCat(mk, txns)
+  const flow = monthFlow(mk, txns)
+  return {
+    obls,
+    oblTotal,
+    limitTotal,
+    spent,
+    income: expectedIncome || flow.income,
+    left: (expectedIncome || flow.income) - oblTotal - limitTotal,
+    unsetObl: obls.filter((o) => !Number(o.amount) && !o.paid).length,
+  }
+}

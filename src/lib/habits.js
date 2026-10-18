@@ -62,7 +62,7 @@ export function indexChecks(checks) {
   return byDate
 }
 
-function isDone(def, set) {
+export function isDone(def, set) {
   if (!set) return false
   if (def.needs) return def.needs.every((i) => set.has(i))
   return set.has(def.id)

@@ -24,6 +24,7 @@ export const NOTIFY_DEFAULTS = {
   bills: true,
   water: true, // مواعيد كوبايات المية
   fast: true, // سؤال الصيام والسحور
+  report: true, // تقرير الأسبوع الخميس بالليل وتقرير الشهر أوله
   plan: true, // مواعيد الدكاترة والتطعيمات، وفيديو مش متجدول، ومهام الخطة المهمة
 }
 
@@ -126,7 +127,7 @@ export async function buildSchedule(settings, now = new Date()) {
           push(
             timeOnDay(day, isToday ? '10:00' : '20:00'),
             isToday ? `النهارده معاد ${o.name}` : `بكرة معاد ${o.name}`,
-            `${Math.round(o.amount).toLocaleString('ar-EG')} جنيه`,
+            Number(o.amount) ? `${Math.round(o.amount).toLocaleString('ar-EG')} جنيه` : 'سجّل المبلغ لما تدفع',
             `bill-${o.id}-${k}`,
             null,
             i,
@@ -213,6 +214,14 @@ export async function buildSchedule(settings, now = new Date()) {
       for (const r of remindersFor(all, dateKey(day), day.getDay())) {
         if (r.at) push(timeOnDay(day, r.at), r.title, 'تذكير', `rem-${r.id}-${dateKey(day)}`, null, i)
       }
+    }
+  }
+  // التقرير: الخميس ٩ وربع بالليل، وأول الشهر
+  if (prefs.report) {
+    for (let i = 0; i < 2; i++) {
+      const day = addDays(today, i)
+      if (day.getDay() === 4) push(timeOnDay(day, '21:15'), 'تقرير الأسبوع جاهز', 'افتح تقدّمي ← تقرير الأسبوع، وانسخه لكلود', `report-w-${dateKey(day)}`, null, i)
+      if (day.getDate() === 1) push(timeOnDay(day, '10:00'), 'تقرير الشهر جاهز', 'افتح تقدّمي ← تقرير الشهر، وانسخه لكلود', `report-m-${dateKey(day)}`, null, i)
     }
   }
   // تذكير بالنسخة الاحتياطية الساعة ٩ بالليل لو مستحقة

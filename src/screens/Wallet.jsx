@@ -1,15 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Icon from '../components/Icon.jsx'
 import { db, setSetting } from '../db.js'
-import { formatShortDate, fromKey, monthKey, num, todayKey } from '../lib/dates.js'
+import { daysInMonth, formatShortDate, fromKey, monthKey, num, todayKey } from '../lib/dates.js'
 import { clientLedger, monthLabel } from '../lib/work.js'
+import { QUICK_EXAMPLES, parseQuick } from '../lib/quickadd.js'
+import { speechSupported } from '../lib/recite.js'
 import {
   ACCOUNT_TYPES,
   CATEGORIES,
   INCOME_CATS,
+  LIMIT_CATS,
+  OBLIGATION_KINDS,
   addTxn,
   balances,
+  budgetSummary,
+  seedBudget,
+  spendByCat,
+  suggestLimits,
   debtLeft,
   egp,
   grams,
@@ -26,7 +34,9 @@ export default function Wallet({ settings, onOpenWork }) {
   const [form, setForm] = useState(null)
 
   useEffect(() => {
-    seedWallet().then(() => setReady(true))
+    seedWallet()
+      .then(seedBudget)
+      .then(() => setReady(true))
   }, [])
 
   const data = useLiveQuery(async () => {
@@ -56,9 +66,11 @@ export default function Wallet({ settings, onOpenWork }) {
   const owedToMe = data.clients.reduce((s, c) => s + clientLedger(c, data.jobs, data.payments).owed, 0)
   const obls = obligationsFor(mk, data.obligations, data.txns)
   const unpaidObl = obls.filter((o) => !o.paid).reduce((s, o) => s + (Number(o.amount) || 0), 0)
-  const debtsOpen = data.debts.filter((d) => debtLeft(d) > 0.5)
+  const debtsOpen = data.debts.filter((d) => debtLeft(d) > 0.5 && (d.dir || 'iOwe') === 'iOwe')
+  const lentOpen = data.debts.filter((d) => debtLeft(d) > 0.5 && d.dir === 'owedMe')
   const iOwe = debtsOpen.reduce((s, d) => s + debtLeft(d), 0)
-  const net = have + inEnvelopes + owedToMe - iOwe - unpaidObl
+  const lent = lentOpen.reduce((s, d) => s + debtLeft(d), 0)
+  const net = have + inEnvelopes + owedToMe + lent - iOwe - unpaidObl
   const flow = monthFlow(mk, data.txns)
   const recent = [...data.txns].sort((a, b) => (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || ''))).slice(0, 12)
   const accName = (id) => data.accounts.find((a) => a.id === id)?.name || '—'
@@ -69,7 +81,7 @@ export default function Wallet({ settings, onOpenWork }) {
     if (form.type === 'account') return <AccountForm account={form.account} balance={form.account ? acc[form.account.id] : 0} onDone={close} />
     if (form.type === 'envelope') return <EnvelopeForm envelope={form.envelope} accounts={accounts} balance={form.envelope ? env[form.envelope.id] || 0 : 0} onDone={close} />
     if (form.type === 'obligation') return <ObligationForm obligation={form.obligation} onDone={close} />
-    if (form.type === 'debt') return <DebtForm debt={form.debt} accounts={accounts} onDone={close} />
+    if (form.type === 'debt') return <DebtForm debt={form.debt} dirPreset={form.preset?.dir} accounts={accounts} onDone={close} />
     return <TxnForm kind={form.type} accounts={accounts} envelopes={envelopes} preset={form.preset} goldPrice={goldPrice} onDone={close} />
   }
 
@@ -94,7 +106,7 @@ export default function Wallet({ settings, onOpenWork }) {
           </div>
           <button className="link-row" onClick={onOpenWork}>
             <small>ليا برّه</small>
-            <strong>{egp(owedToMe)}</strong>
+            <strong>{egp(owedToMe + lent)}</strong>
           </button>
           <div>
             <small>عليّا</small>
@@ -102,6 +114,8 @@ export default function Wallet({ settings, onOpenWork }) {
           </div>
         </div>
       </section>
+
+      <QuickAdd data={data} accounts={accounts} envelopes={envelopes} mk={mk} onForm={setForm} />
 
       <div className="quick-grid">
         <button className="btn" onClick={() => setForm({ type: 'expense' })}>
@@ -161,43 +175,11 @@ export default function Wallet({ settings, onOpenWork }) {
         )}
       </section>
 
-      <section className="card">
-        <div className="row-between">
-          <h2>{monthLabel(mk)}</h2>
-          <span className={`pill ${flow.income >= flow.expense ? 'pill-ok' : 'st-slipped'}`}>
-            {flow.income >= flow.expense ? `فاضل ${egp(flow.income - flow.expense)}` : `صرفت أكتر بـ ${egp(flow.expense - flow.income)}`}
-          </span>
-        </div>
-        <div className="flow">
-          <div>
-            <small>دخل</small>
-            <strong className="pos">{egp(flow.income)}</strong>
-          </div>
-          <div>
-            <small>صرف</small>
-            <strong className="neg">{egp(flow.expense)}</strong>
-          </div>
-        </div>
-        {flow.byCat.length > 0 && (
-          <ul className="bars">
-            {flow.byCat.map(([cat, v]) => (
-              <li key={cat}>
-                <div className="row-between">
-                  <span>{cat}</span>
-                  <span className="muted">{egp(v)}</span>
-                </div>
-                <span className="bar" style={{ '--bar': 'var(--c-money)' }}>
-                  <span style={{ width: `${(v / flow.expense) * 100}%` }} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Budget mk={mk} txns={data.txns} obligations={data.obligations} settings={settings} flow={flow} />
 
       <section className="card">
         <div className="row-between">
-          <h2>التزامات الشهر</h2>
+          <h2>الالتزامات والفواتير</h2>
           <button className="link-btn" onClick={() => setForm({ type: 'obligation' })}>
             + التزام
           </button>
@@ -210,7 +192,11 @@ export default function Wallet({ settings, onOpenWork }) {
               <li key={o.id} className={`task ${o.paid ? 'is-done' : ''}`}>
                 <button className="task-title link-row" onClick={() => setForm({ type: 'obligation', obligation: o })}>
                   <span>
-                    {o.name} <span className="money">{egp(o.amount)}</span>
+                    {o.name}{' '}
+                    <span className="money">
+                      {o.paid ? egp(o.paidTx.amount) : Number(o.amount) ? `${o.kind === 'bill' ? '≈ ' : ''}${egp(o.amount)}` : ''}
+                    </span>
+                    {!o.paid && !Number(o.amount) && <small className="late"> حدد المبلغ</small>}
                   </span>
                   <small className={!o.paid && o.due < today ? 'late' : 'muted'}>
                     {o.paid ? `اتدفع ${formatShortDate(fromKey(o.paidTx.date))}` : `معاده ${formatShortDate(fromKey(o.due))}`}
@@ -295,6 +281,30 @@ export default function Wallet({ settings, onOpenWork }) {
           </ul>
         )}
       </section>
+
+      {lentOpen.length > 0 && (
+        <section className="card">
+          <div className="row-between">
+            <h2>ليّا عند ناس</h2>
+            <button className="link-btn" onClick={() => setForm({ type: 'debt', preset: { dir: 'owedMe' } })}>
+              + سلفة
+            </button>
+          </div>
+          <ul className="totals">
+            {lentOpen.map((d) => (
+              <li key={d.id}>
+                <button className="link-row row-between" onClick={() => setForm({ type: 'debt', debt: d })}>
+                  <span className="tl-text">
+                    <strong>{d.person}</strong>
+                    <small>{d.note || formatShortDate(fromKey(d.date))}</small>
+                  </span>
+                  <strong className="money pos">{egp(debtLeft(d))}</strong>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {recent.length > 0 && (
         <section className="card">
@@ -665,11 +675,12 @@ function ObligationForm({ obligation, onDone }) {
   const [amount, setAmount] = useState(obligation?.amount || '')
   const [dueDay, setDueDay] = useState(obligation?.dueDay || 1)
   const [category, setCategory] = useState(obligation?.category || 'فواتير واشتراكات')
+  const [kind, setKind] = useState(obligation?.kind || 'fixed')
 
   async function save(e) {
     e.preventDefault()
     if (!name.trim()) return
-    const data = { name: name.trim(), amount: Number(amount) || 0, dueDay: Number(dueDay) || 1, category, active: true }
+    const data = { name: name.trim(), amount: Number(amount) || 0, dueDay: Number(dueDay) || 1, category, kind, active: true }
     if (obligation) await db.obligations.update(obligation.id, data)
     else await db.obligations.add(data)
     onDone()
@@ -688,8 +699,15 @@ function ObligationForm({ obligation, onDone }) {
           <span>الالتزام</span>
           <input className="input" placeholder="مثلًا: الإيجار، النت، قسط…" value={name} onChange={(e) => setName(e.target.value)} maxLength={30} />
         </label>
+        <div className="seg" role="radiogroup" aria-label="النوع">
+          {Object.entries(OBLIGATION_KINDS).map(([id, label]) => (
+            <button key={id} type="button" className={kind === id ? 'is-on' : ''} onClick={() => setKind(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
         <label className="field">
-          <span>المبلغ (جنيه)</span>
+          <span>{kind === 'bill' ? 'المتوسط في الشهر (جنيه) — ولما تدفع تكتب الحقيقي' : 'المبلغ (جنيه)'}</span>
           <input className="input" type="number" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </label>
         <label className="field field-row">
@@ -723,7 +741,9 @@ function ObligationForm({ obligation, onDone }) {
   )
 }
 
-function DebtForm({ debt, accounts, onDone }) {
+function DebtForm({ debt, dirPreset, accounts, onDone }) {
+  const [dir, setDir] = useState(debt?.dir || dirPreset || 'iOwe')
+  const lentMode = dir === 'owedMe'
   const [person, setPerson] = useState(debt?.person || '')
   const [amount, setAmount] = useState(debt?.amount || '')
   const [note, setNote] = useState(debt?.note || '')
@@ -734,7 +754,7 @@ function DebtForm({ debt, accounts, onDone }) {
   async function save(e) {
     e.preventDefault()
     if (!person.trim()) return
-    const data = { person: person.trim(), amount: Number(amount) || 0, note: note.trim() }
+    const data = { person: person.trim(), amount: Number(amount) || 0, note: note.trim(), dir }
     if (debt) await db.debts.update(debt.id, data)
     else await db.debts.add({ ...data, date: todayKey(), paid: [] })
     onDone()
@@ -744,7 +764,11 @@ function DebtForm({ debt, accounts, onDone }) {
     const v = Number(pay)
     if (!v || !debt) return
     await db.debts.update(debt.id, { paid: [...(debt.paid || []), { date: todayKey(), amount: v }] })
-    await addTxn({ type: 'expense', amount: v, accountId: Number(accountId), category: 'تانية', note: `سداد: ${debt.person}` })
+    await addTxn(
+      lentMode
+        ? { type: 'income', amount: v, accountId: Number(accountId), category: 'تانية', note: `رجّعلي: ${debt.person}` }
+        : { type: 'expense', amount: v, accountId: Number(accountId), category: 'تانية', note: `سداد: ${debt.person}` },
+    )
     onDone()
   }
 
@@ -754,12 +778,12 @@ function DebtForm({ debt, accounts, onDone }) {
         <Icon name="chevronRight" size={18} /> المحفظة
       </button>
       <header className="page-head">
-        <h1>{debt ? `عليّا لـ ${debt.person}` : 'دين عليّا'}</h1>
+        <h1>{debt ? (lentMode ? `ليّا عند ${debt.person}` : `عليّا لـ ${debt.person}`) : lentMode ? 'سلّفت حد' : 'دين عليّا'}</h1>
         {debt && <p className="muted">فاضل {egp(left)}</p>}
       </header>
       {debt && left > 0 && (
         <section className="card add-task">
-          <h2>سدّدت جزء</h2>
+          <h2>{lentMode ? 'رجّعلي جزء' : 'سدّدت جزء'}</h2>
           <div className="row">
             <input className="input" type="number" inputMode="numeric" placeholder="المبلغ" value={pay} onChange={(e) => setPay(e.target.value)} />
             <select className="input input-small" value={accountId} onChange={(e) => setAccountId(Number(e.target.value))}>
@@ -767,7 +791,7 @@ function DebtForm({ debt, accounts, onDone }) {
                 .filter((a) => a.type !== 'gold')
                 .map((a) => (
                   <option key={a.id} value={a.id}>
-                    من {a.name}
+                    {lentMode ? 'على' : 'من'} {a.name}
                   </option>
                 ))}
             </select>
@@ -778,8 +802,16 @@ function DebtForm({ debt, accounts, onDone }) {
         </section>
       )}
       <form className="card add-task" onSubmit={save}>
+        <div className="seg" role="radiogroup" aria-label="النوع">
+          <button type="button" className={!lentMode ? 'is-on' : ''} onClick={() => setDir('iOwe')}>
+            عليّا لحد
+          </button>
+          <button type="button" className={lentMode ? 'is-on' : ''} onClick={() => setDir('owedMe')}>
+            ليّا عند حد
+          </button>
+        </div>
         <label className="field">
-          <span>لمين؟</span>
+          <span>{lentMode ? 'مين؟' : 'لمين؟'}</span>
           <input className="input" value={person} onChange={(e) => setPerson(e.target.value)} maxLength={30} />
         </label>
         <label className="field">
@@ -795,5 +827,401 @@ function DebtForm({ debt, accounts, onDone }) {
         </button>
       </form>
     </>
+  )
+}
+
+// ===== ميزانية الشهر: المتوقع يدخل، والالتزامات، وحد لكل بند، والمفروض يفضل كام =====
+function Budget({ mk, txns, obligations, settings, flow }) {
+  const limits = settings.budgetLimits || {}
+  const [editing, setEditing] = useState(null) // اسم البند اللي بنعدّل حده
+  const [val, setVal] = useState('')
+  const [suggest, setSuggest] = useState(null)
+  const [editIncome, setEditIncome] = useState(false)
+
+  const now = new Date()
+  const prevMk = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+  const prevIncome = monthFlow(prevMk, txns).income
+  // القاعدة: فلوس الشهر اللي فات هي اللي بتتصرف الشهر ده
+  const expectedIncome = Number(settings.budgetIncome) || prevIncome || 0
+  const sum = budgetSummary({ mk, txns, obligations, limits, expectedIncome })
+  const prevSpent = spendByCat(prevMk, txns)
+  const dayFrac = now.getDate() / daysInMonth(now.getFullYear(), now.getMonth())
+  const cats = [...new Set([...LIMIT_CATS.filter((c) => c in limits || sum.spent[c]), ...Object.keys(sum.spent).filter((c) => c !== 'فواتير واشتراكات')])]
+  const extra = LIMIT_CATS.filter((c) => !cats.includes(c))
+
+  async function saveLimit(cat) {
+    const v = Number(val) || 0
+    const next = { ...limits }
+    if (v) next[cat] = v
+    else delete next[cat]
+    await setSetting('budgetLimits', next)
+    setEditing(null)
+  }
+
+  return (
+    <section className="card budget">
+      <div className="row-between">
+        <h2>ميزانية {monthLabel(mk)}</h2>
+        <span className={`pill ${flow.income >= flow.expense ? 'pill-ok' : 'st-slipped'}`}>
+          دخل {egp(flow.income)}، صرف {egp(flow.expense)}
+        </span>
+      </div>
+
+      <div className="budget-sum">
+        <button className="link-row" onClick={() => setEditIncome(!editIncome)}>
+          <small>هيدخل الشهر ده</small>
+          <strong>{sum.income ? egp(sum.income) : 'حدده'}</strong>
+          <small className="muted">
+            {settings.budgetIncome ? 'إنت محدده' : prevIncome ? 'دخل الشهر اللي فات' : sum.income ? 'اللي دخل الشهر ده لحد دلوقتي' : 'دوس وحط رقم'}
+          </small>
+        </button>
+        <div>
+          <small>التزامات وفواتير</small>
+          <strong>{egp(sum.oblTotal)}</strong>
+          {sum.unsetObl > 0 && <small className="late">{num(sum.unsetObl)} من غير مبلغ</small>}
+        </div>
+        <div>
+          <small>حدود الصرف</small>
+          <strong>{egp(sum.limitTotal)}</strong>
+        </div>
+        <div className={sum.left >= 0 ? 'good' : 'bad'}>
+          <small>المفروض يفضل للأظرف</small>
+          <strong>{egp(sum.left)}</strong>
+        </div>
+      </div>
+      {editIncome && (
+        <label className="field field-row">
+          <span>الدخل المتوقع (فاضي = دخل الشهر اللي فات)</span>
+          <input
+            className="input input-small"
+            type="number"
+            inputMode="numeric"
+            defaultValue={settings.budgetIncome || ''}
+            onBlur={(e) => {
+              setSetting('budgetIncome', Number(e.target.value) || 0)
+              setEditIncome(false)
+            }}
+            autoFocus
+          />
+        </label>
+      )}
+
+      <ul className="bars budget-cats">
+        {cats.map((c) => {
+          const spent = sum.spent[c] || 0
+          const lim = Number(limits[c]) || 0
+          const r = lim ? spent / lim : 0
+          const ahead = lim && r > dayFrac + 0.15 && r < 1
+          const prev = prevSpent[c] || 0
+          const trend = prev ? (spent / dayFrac - prev) / prev : 0
+          return (
+            <li key={c}>
+              {editing === c ? (
+                <div className="row">
+                  <input className="input" type="number" inputMode="numeric" placeholder="الحد في الشهر (٠ = من غير حد)" value={val} onChange={(e) => setVal(e.target.value)} autoFocus />
+                  <button className="btn btn-small" onClick={() => saveLimit(c)}>
+                    حفظ
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="link-row budget-row"
+                  onClick={() => {
+                    setEditing(c)
+                    setVal(lim || '')
+                  }}
+                >
+                  <div className="row-between">
+                    <span>
+                      {c}
+                      {prev > 0 && Math.abs(trend) >= 0.2 && dayFrac > 0.25 && (
+                        <small className={trend > 0 ? 'neg' : 'pos'}> {trend > 0 ? '↑' : '↓'} عن الشهر اللي فات</small>
+                      )}
+                    </span>
+                    <span className={r >= 1 ? 'neg' : 'muted'}>
+                      {egp(spent)}
+                      {lim ? ` من ${egp(lim)}` : ' — حط حد'}
+                    </span>
+                  </div>
+                  {lim > 0 && (
+                    <>
+                      <span className="bar" style={{ '--bar': r >= 1 ? 'var(--c-health)' : ahead ? 'var(--c-money)' : 'var(--c-faith)' }}>
+                        <span style={{ width: `${Math.min(1, r) * 100}%` }} />
+                      </span>
+                      <small className={r >= 1 ? 'neg' : ahead ? 'late' : 'muted'}>
+                        {r >= 1 ? `زاد ${egp(spent - lim)}` : `فاضلك ${egp(lim - spent)}${ahead ? '، بتصرف أسرع من الشهر' : ''}`}
+                      </small>
+                    </>
+                  )}
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      {extra.length > 0 && (
+        <div className="chip-wrap">
+          {extra.map((c) => (
+            <button
+              key={c}
+              className="chip"
+              onClick={() => {
+                setEditing(c)
+                setVal('')
+                setSetting('budgetLimits', { ...limits, [c]: 0 })
+              }}
+            >
+              + {c}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {suggest ? (
+        <div className="suggest">
+          {suggest.basis === 'none' ? (
+            <p className="muted">لسه مفيش صرف كفاية. سجّل صرفك أسبوعين على الأقل وجرّب تاني.</p>
+          ) : (
+            <>
+              <p className="muted">
+                {suggest.basis === 'current' ? 'على حسب صرفك الشهر ده لحد دلوقتي:' : `على حسب متوسط آخر ${num(Number(suggest.basis))} شهر:`}
+              </p>
+              <ul className="totals">
+                {Object.entries(suggest.limits)
+                  .filter(([c]) => c !== 'فواتير واشتراكات')
+                  .map(([c, v]) => (
+                    <li key={c}>
+                      <span>{c}</span>
+                      <strong>{egp(v)}</strong>
+                    </li>
+                  ))}
+              </ul>
+              <div className="row">
+                <button
+                  className="btn btn-small"
+                  onClick={async () => {
+                    const { ['فواتير واشتراكات']: _, ...rest } = suggest.limits
+                    await setSetting('budgetLimits', { ...limits, ...rest })
+                    setSuggest(null)
+                  }}
+                >
+                  خليهم الحدود
+                </button>
+                <button className="btn btn-ghost btn-small" onClick={() => setSuggest(null)}>
+                  لأ
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <button className="btn btn-ghost btn-wide" onClick={() => setSuggest(suggestLimits(txns))}>
+          اقترح حدود من صرفي
+        </button>
+      )}
+    </section>
+  )
+}
+
+// ===== اكتب زي ما بتتكلم =====
+const TYPE_ICON = { expense: '−', income: '+', iOwe: 'عليّا', owedMe: 'ليّا', obligation: 'كل شهر', payObligation: 'اتدفع', payDebt: 'سداد', collectDebt: 'رجّعلي', toEnvelope: 'ظرف', goal: 'هدف', gold: 'دهب' }
+
+function QuickAdd({ data, accounts, envelopes, mk, onForm }) {
+  const [text, setText] = useState('')
+  const [p, setP] = useState(null)
+  const [cat, setCat] = useState(null)
+  const [acc, setAcc] = useState(null)
+  const [env, setEnv] = useState(null)
+  const [done, setDone] = useState(null)
+  const [listening, setListening] = useState(false)
+  const stopRef = useRef(null)
+
+  function parse(t = text) {
+    const r = parseQuick(t, { obligations: data.obligations, clients: data.clients, envelopes, debts: data.debts })
+    setP(r)
+    setCat(r?.category || null)
+    setEnv(r?.envelope?.id || envelopes[0]?.id || null)
+    const want = r?.type === 'gold' ? 'cash' : r?.accountHint
+    setAcc((accounts.find((a) => a.type === want) || accounts.find((a) => a.type !== 'gold'))?.id || null)
+  }
+
+  function mic() {
+    if (listening) {
+      stopRef.current?.()
+      return
+    }
+    setListening(true)
+    try {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+      const rec = new SR()
+      rec.lang = 'ar-EG'
+      rec.interimResults = false
+      rec.onresult = (e) => {
+        const t = e.results[0][0].transcript
+        setText(t)
+        parse(t)
+      }
+      rec.onend = () => setListening(false)
+      rec.onerror = () => setListening(false)
+      rec.start()
+      stopRef.current = () => rec.stop()
+    } catch {
+      setListening(false)
+    }
+  }
+
+  async function commit() {
+    const v = Number(p.amount) || 0
+    const accountId = Number(acc)
+    const base = { date: p.date, month: p.date.slice(0, 7) }
+    switch (p.type) {
+      case 'expense':
+        await addTxn({ ...base, type: 'expense', amount: v, accountId, category: cat || 'تانية', note: p.note })
+        break
+      case 'income':
+        if (p.client) {
+          await db.transaction('rw', db.payments, db.txns, async () => {
+            const pid = await db.payments.add({ clientId: p.client.id, amount: v, date: p.date, jobId: null, note: 'من المحفظة' })
+            await db.txns.add({ ...base, type: 'income', amount: v, accountId, category: 'شغل', note: p.client.name, paymentId: pid, createdAt: new Date().toISOString() })
+          })
+        } else await addTxn({ ...base, type: 'income', amount: v, accountId, category: p.category || 'تانية', note: p.note })
+        break
+      case 'iOwe':
+      case 'owedMe':
+        if (!p.person) return onForm({ type: 'debt', preset: { dir: p.type } })
+        await db.debts.add({ person: p.person, amount: v, date: p.date, note: '', paid: [], dir: p.type })
+        break
+      case 'obligation':
+        await db.obligations.add({ name: p.name, amount: v, dueDay: p.dueDay, category: p.category, kind: p.kind, active: true })
+        break
+      case 'payObligation':
+        await addTxn({ type: 'expense', amount: v || Number(p.obligation.amount) || 0, accountId, category: p.category, note: p.obligation.name, obligationId: p.obligation.id, month: mk, date: p.date })
+        break
+      case 'payDebt':
+      case 'collectDebt':
+        await db.debts.update(p.debt.id, { paid: [...(p.debt.paid || []), { date: p.date, amount: v }] })
+        await addTxn({ ...base, type: p.type === 'payDebt' ? 'expense' : 'income', amount: v, accountId, category: 'تانية', note: `${p.type === 'payDebt' ? 'سداد' : 'رجّعلي'}: ${p.debt.person}` })
+        break
+      case 'toEnvelope':
+        if (!env) return
+        await addTxn({ ...base, type: 'toEnvelope', amount: v, accountId, envelopeId: Number(env) })
+        break
+      case 'gold': {
+        const gold = accounts.find((a) => a.type === 'gold')
+        if (!gold) return
+        await addTxn({ ...base, type: 'transfer', amount: v, accountId, toAccountId: gold.id, toAmount: p.grams || 0 })
+        break
+      }
+      case 'goal':
+        if (p.envelope) await db.envelopes.update(p.envelope.id, { target: v })
+        else await db.envelopes.add({ name: p.name, target: v, kind: 'cash', priority: envelopes.length + 1, active: true })
+        break
+      default:
+        return
+    }
+    setDone(`اتسجّل: ${p.label}${v ? ` ${p.type === 'gold' ? egp(v) : egp(v)}` : ''}`)
+    setText('')
+    setP(null)
+    setTimeout(() => setDone(null), 3500)
+  }
+
+  const needsAccount = ['expense', 'income', 'payObligation', 'payDebt', 'collectDebt', 'toEnvelope', 'gold'].includes(p?.type)
+  return (
+    <section className="card quick-add">
+      <form
+        className="row"
+        onSubmit={(e) => {
+          e.preventDefault()
+          parse()
+        }}
+      >
+        <input
+          className="input"
+          placeholder="اكتب زي ما بتتكلم: اشتريت قهوة ب ٤٠"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value)
+            if (p) setP(null)
+          }}
+          enterKeyHint="done"
+        />
+        {speechSupported() && (
+          <button type="button" className={`icon-btn mic-mini ${listening ? 'is-on' : ''}`} onClick={mic} aria-label="قول بصوتك">
+            <Icon name="mic" size={20} />
+          </button>
+        )}
+        <button className="btn btn-small" type="submit" disabled={!text.trim()}>
+          ←
+        </button>
+      </form>
+      {done && <p className="qa-done">{done} ✓</p>}
+      {!p && !done && !text && (
+        <div className="chip-wrap qa-examples">
+          {QUICK_EXAMPLES.slice(0, 4).map((x) => (
+            <button
+              key={x}
+              className="chip"
+              onClick={() => {
+                setText(x)
+                parse(x)
+              }}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
+      )}
+      {p && (
+        <div className={`qa-preview ${p.type === 'unknown' ? 'is-bad' : ''}`}>
+          <div className="row-between">
+            <span className="qa-type">{TYPE_ICON[p.type] || '؟'}</span>
+            <strong className="qa-label">{p.label}</strong>
+            {p.amount > 0 && <strong className="money">{egp(p.amount)}</strong>}
+          </div>
+          {p.type === 'gold' && <small className="muted">{num(p.grams || 0)} جرام</small>}
+          {p.note && p.type === 'expense' && <small className="muted">{p.note}</small>}
+          {p.date !== todayKey() && <small className="muted">بتاريخ امبارح</small>}
+          {p.type === 'expense' && (
+            <div className="chip-wrap">
+              {CATEGORIES.map((c) => (
+                <button key={c} type="button" className={`chip ${cat === c ? 'chip-on' : ''}`} onClick={() => setCat(c)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+          {p.type === 'toEnvelope' && (
+            <select className="input" value={env || ''} onChange={(e) => setEnv(e.target.value)}>
+              {envelopes.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {needsAccount && (
+            <select className="input" value={acc || ''} onChange={(e) => setAcc(e.target.value)}>
+              {accounts
+                .filter((a) => a.type !== 'gold')
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {p.type === 'income' || p.type === 'collectDebt' ? 'دخلت على' : 'من'} {a.name}
+                  </option>
+                ))}
+            </select>
+          )}
+          {p.type !== 'unknown' && (
+            <div className="row">
+              <button className="btn" onClick={commit} disabled={!p.amount && !['goal'].includes(p.type)}>
+                سجّل
+              </button>
+              <button className="btn btn-ghost" onClick={() => setP(null)}>
+                لأ
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
