@@ -6,7 +6,9 @@ import TasbihSheet from '../components/TasbihSheet.jsx'
 import { db, setCheck, setSetting } from '../db.js'
 import { useNow } from '../hooks.js'
 import { buildDay, currentPrayer, progressFor } from '../lib/day.js'
-import { groupTasks } from '../lib/tasks.js'
+import { addTask, groupTasks } from '../lib/tasks.js'
+import { addReminder, remindersFor } from '../lib/reminders.js'
+import { sync } from '../lib/push.js'
 import { CheckButton, TaskItem } from '../components/TaskParts.jsx'
 import {
   addDays,
@@ -14,6 +16,7 @@ import {
   formatDuration,
   formatGregorian,
   formatHijri,
+  formatShortDate,
   formatTime,
   greeting,
   logicalDate,
@@ -33,17 +36,18 @@ import { postStage } from '../lib/plan.js'
 import { isSunnahFastDay, mealNames, tomorrowKey, waterPlan, waterStatus } from '../lib/water.js'
 
 // من الخطة: فيديو نازل النهارده أو بكرة، ومواعيد الدكاترة والتطعيمات
-function PlanToday({ today, onOpenSub }) {
-  const tomorrow = dateKey(addDays(new Date(today + 'T12:00'), 1))
+function PlanToday({ today, isToday, onOpenSub }) {
+  // النهارده بنوري بكرة كمان؛ أي يوم تاني بنوري اليوم ده بس
+  const tomorrow = isToday ? dateKey(addDays(new Date(today + 'T12:00'), 1)) : today
   const data = useLiveQuery(async () => {
     const [posts, appts] = await Promise.all([
       db.posts.where('date').between(today, tomorrow, true, true).toArray(),
-      db.appts.where('date').belowOrEqual(tomorrow).toArray(),
+      isToday ? db.appts.where('date').belowOrEqual(tomorrow).toArray() : db.appts.where('date').equals(today).toArray(),
     ])
     return { posts, appts: appts.filter((a) => !a.done) }
   }, [today, tomorrow])
   if (!data || (!data.posts.length && !data.appts.length)) return null
-  const when = (d) => (d === today ? 'النهارده' : d === tomorrow ? 'بكرة' : 'فات معاده')
+  const when = (d) => (!isToday ? 'اليوم ده' : d === today ? 'النهارده' : d === tomorrow ? 'بكرة' : 'فات معاده')
   return (
     <section className="card plan-today">
       {data.posts.map((p) => {
@@ -79,12 +83,14 @@ function PlanToday({ today, onOpenSub }) {
 
 export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOpenSub }) {
   const realNow = useNow()
-  const [offset, setOffset] = useState(0) // ٠ = النهارده، -١ = امبارح (لو نسيت تعلّم)
+  const [offset, setOffset] = useState(0) // ٠ = النهارده، سالب = أيام فاتت، موجب = أيام جاية
   const isToday = offset === 0
+  const isFuture = offset > 0
   const day = addDays(logicalDate(realNow), offset)
   const today = isToday ? todayKey(realNow) : dateKey(day)
-  // لما بنبص على امبارح بنعتبر اليوم كله خلص
-  const now = isToday ? realNow : addDays(day, 1)
+  // يوم فات: اليوم كله خلص. يوم جاي: لسه ما بدأش
+  const now = isToday ? realNow : isFuture ? day : addDays(day, 1)
+  const dayLabel = offset === 0 ? 'النهارده' : offset === -1 ? 'امبارح' : offset === 1 ? 'بكرة' : formatShortDate(day)
   const [tasbihFor, setTasbihFor] = useState(null)
   const [locMsg, setLocMsg] = useState(null)
   const [overlay, setOverlay] = useState(null) // { kind: 'quran'|'adhkar'|'gym', ... }
@@ -151,16 +157,21 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
         </p>
       </header>
 
-      <div className="seg day-switch" role="radiogroup" aria-label="اليوم">
-        <button className={!isToday ? 'is-on' : ''} onClick={() => setOffset(-1)}>
-          امبارح
+      <div className="day-nav" aria-label="اتنقل بين الأيام">
+        <button className="icon-btn" onClick={() => setOffset(Math.max(-60, offset - 1))} aria-label="اليوم اللي قبله">
+          <Icon name="chevronRight" />
         </button>
-        <button className={isToday ? 'is-on' : ''} onClick={() => setOffset(0)}>
-          النهارده
+        <button className={`day-nav-label ${isToday ? 'is-today' : ''}`} onClick={() => setOffset(0)}>
+          <strong>{dayLabel}</strong>
+          {!isToday && <small>{offset < -1 || offset > 1 ? DAY_LABEL[day.getDay()] : formatShortDate(day)} — دوس للنهارده</small>}
+        </button>
+        <button className="icon-btn" onClick={() => setOffset(Math.min(120, offset + 1))} aria-label="اليوم اللي بعده">
+          <Icon name="chevronLeft" />
         </button>
       </div>
 
-      {!isToday && <p className="muted center">بتعلّم على يوم امبارح — لو نسيت حاجة علّمها هنا.</p>}
+      {offset < 0 && <p className="muted center">يوم فات — لو نسيت تعلّم حاجة علّمها هنا.</p>}
+      {isFuture && <p className="muted center">يوم جاي: شوف عليك إيه، وضيف تذكير أو مهمة.</p>}
 
       {isToday && !isStandalone() && <InstallCard ios={isIOS()} />}
 
@@ -197,7 +208,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
             aspects={aspects}
             progress={progress.aspects}
             centerValue={`${num(Math.round(progress.overall * 100))}٪`}
-            centerLabel={isToday ? 'النهارده' : 'امبارح'}
+            centerLabel={dayLabel}
           />
           <ul className="legend legend-col">
             {aspects.map((a) => (
@@ -220,12 +231,15 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
         )}
       </section>
 
-      {isToday && <PlanToday today={today} onOpenSub={onOpenSub} />}
+      <PlanToday today={today} isToday={isToday} onOpenSub={onOpenSub} />
+
+      <DayReminders dateK={today} weekday={day.getDay()} label={dayLabel} settings={settings} />
 
       <FastCard
         day={day}
         now={now}
         isToday={isToday}
+        isFuture={isFuture}
         times={times}
         today={today}
         checkedSet={checkedSet}
@@ -233,7 +247,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
         tomorrowSet={new Set((tomorrowChecks || []).map((c) => c.item))}
       />
 
-      <ol className="timeline">
+      <ol className={`timeline ${isFuture ? 'is-future' : ''}`}>
         {rows.map((r) => {
           if (r.type === 'prayer')
             return (
@@ -271,7 +285,6 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
             )
           }
           if (r.type === 'work') {
-            if (!isToday) return null
             return (
               <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
             )
@@ -322,7 +335,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
         })}
       </ol>
 
-      <button
+      {!isFuture && <button
         className={`card card-action excuse ${excused ? 'is-on' : ''}`}
         onClick={() => toggle('day:excused', !excused)}
         aria-pressed={excused}
@@ -338,7 +351,7 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
               : 'علّمه عشان اللي يفوتك من العادات ما يكسرش السلسلة'}
           </small>
         </span>
-      </button>
+      </button>}
 
       {overlay?.kind === 'quran' && (
         <QuranReader juz={overlay.juz} today={today} settings={settings} onClose={() => setOverlay(null)} />
@@ -443,13 +456,137 @@ function CheckRow({ row, done, onToggle, onOpen, openLabel }) {
   )
 }
 
+const DAY_LABEL = { 6: 'السبت', 0: 'الحد', 1: 'الاتنين', 2: 'التلات', 3: 'الأربع', 4: 'الخميس', 5: 'الجمعة' }
+
+// يوم جاي: تقرر من دلوقتي هتصوم ولا لأ
+function FutureFast({ day, today, checkedSet }) {
+  const yes = checkedSet.has('fast:yes')
+  const no = checkedSet.has('fast:no')
+  if (yes)
+    return (
+      <section className="card fast-card is-on">
+        <div className="row-between">
+          <span>
+            <strong>ناوي تصوم اليوم ده إن شاء الله</strong>
+            <small>هفكّرك بالسحور، والمية هتتقسم من المغرب للفجر.</small>
+          </span>
+          <button className="link-btn" onClick={() => setFast(today, false)}>
+            إلغاء
+          </button>
+        </div>
+      </section>
+    )
+  if (!isSunnahFastDay(day) || no) return null
+  return (
+    <section className="card fast-card">
+      <strong>{DAY_LABEL[day.getDay()]}: هتصوم؟</strong>
+      <div className="row">
+        <button className="btn" onClick={() => setFast(today, true)}>
+          هصوم إن شاء الله
+        </button>
+        <button className="btn btn-ghost" onClick={() => setFast(today, false)}>
+          مش المرة دي
+        </button>
+      </div>
+    </section>
+  )
+}
+
+// تذكيرات اليوم: بإشعار في الساعة اللي تحددها، مرة واحدة أو كل أسبوع — وممكن تضيف مهمة لليوم ده
+function DayReminders({ dateK, weekday, label, settings }) {
+  const all = useLiveQuery(() => db.reminders.toArray(), [])
+  const [adding, setAdding] = useState(false)
+  const [kind, setKind] = useState('reminder') // reminder | task
+  const [title, setTitle] = useState('')
+  const [at, setAt] = useState('20:00')
+  const [weekly, setWeekly] = useState(false)
+  if (!all) return null
+  const list = remindersFor(all, dateK, weekday)
+
+  async function save(e) {
+    e.preventDefault()
+    if (!title.trim()) return
+    if (kind === 'task') await addTask({ title: title.trim(), kind: 'once', category: 'personal', priority: 2, date: dateK })
+    else await addReminder({ title: title.trim(), at, date: dateK, weekly, weekday })
+    setTitle('')
+    setAdding(false)
+    sync(settings).catch(() => {})
+  }
+
+  return (
+    <section className="card reminders">
+      {list.length > 0 && (
+        <ul className="tasks">
+          {list.map((r) => (
+            <li key={r.id} className="task">
+              <Icon name="bell" size={18} />
+              <span className="task-title">
+                {r.title}
+                <small className="muted">
+                  {r.at ? formatTime(new Date(`2000-01-01T${r.at}`)) : ''}
+                  {r.weekday != null && !r.date ? ` — كل ${DAY_LABEL[r.weekday]}` : ''}
+                </small>
+              </span>
+              <button
+                className="icon-btn"
+                onClick={() => window.confirm(`تمسح التذكير "${r.title}"${r.date ? '' : ' (كل أسبوع)'}؟`) && db.reminders.delete(r.id)}
+                aria-label="امسح التذكير"
+              >
+                <Icon name="trash" size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {adding ? (
+        <form className="add-task" onSubmit={save}>
+          <div className="seg seg-small">
+            <button type="button" className={kind === 'reminder' ? 'is-on' : ''} onClick={() => setKind('reminder')}>
+              تذكير بإشعار
+            </button>
+            <button type="button" className={kind === 'task' ? 'is-on' : ''} onClick={() => setKind('task')}>
+              مهمة لليوم ده
+            </button>
+          </div>
+          <input className="input" placeholder={kind === 'task' ? 'المهمة' : 'فكّرني بإيه؟'} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={70} autoFocus />
+          {kind === 'reminder' && (
+            <>
+              <label className="field field-row">
+                <span>الساعة</span>
+                <input className="input input-small" type="time" value={at} onChange={(e) => e.target.value && setAt(e.target.value)} />
+              </label>
+              <label className="field field-row">
+                <span>كل {DAY_LABEL[weekday]}</span>
+                <input type="checkbox" className="switch" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} />
+              </label>
+            </>
+          )}
+          <div className="row">
+            <button className="btn" type="submit">
+              ضيف
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={() => setAdding(false)}>
+              إلغاء
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button className="link-btn add-reminder" onClick={() => setAdding(true)}>
+          <Icon name="plus" size={16} /> تذكير أو مهمة {label === 'النهارده' ? 'للنهارده' : label === 'بكرة' ? 'لبكرة' : 'لليوم ده'}
+        </button>
+      )}
+    </section>
+  )
+}
+
 // الصيام: الاتنين والخميس بيسألك، ولو قررت تصوم المية والوجبات بتتغير
 async function setFast(date, yes) {
   await setCheck(date, yes ? 'fast:yes' : 'fast:no', true)
   await setCheck(date, yes ? 'fast:no' : 'fast:yes', false)
 }
 
-function FastCard({ day, now, isToday, times, today, checkedSet, tomorrowK, tomorrowSet }) {
+function FastCard({ day, now, isToday, isFuture, times, today, checkedSet, tomorrowK, tomorrowSet }) {
+  if (isFuture) return <FutureFast day={day} today={today} checkedSet={checkedSet} />
   const fasting = checkedSet.has('fast:yes')
   const decidedToday = fasting || checkedSet.has('fast:no')
   const tomorrow = addDays(day, 1)

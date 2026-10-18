@@ -23,6 +23,7 @@ import Plan from './screens/Plan.jsx'
 import Posts from './screens/Posts.jsx'
 import Baby from './screens/Baby.jsx'
 import { seedPlan } from './lib/plan.js'
+import { gymEveryDay } from './lib/reminders.js'
 
 const TABS = [
   { id: 'today', label: 'اليوم', icon: 'home' },
@@ -66,6 +67,7 @@ export default function App() {
     seedDefaults()
     seedWallet()
     seedPlan()
+    gymEveryDay()
     ;(async () => {
       if (!(await getSetting('firstUse'))) await setSetting('firstUse', todayKey())
       await setSetting('lastOpened', new Date().toISOString())

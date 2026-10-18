@@ -82,6 +82,11 @@ db.version(6).stores({
   babyItems: '++id',
 })
 
+db.version(7).stores({
+  // التذكيرات: { id, title, at: 'HH:MM', date (مرة واحدة) أو weekday (كل أسبوع), active }
+  reminders: '++id, date',
+})
+
 // أهداف السنة المبدئية — بتتضاف مرة واحدة بس
 export async function seedDefaults() {
   const seeded = await getSetting('seededGoals', false)

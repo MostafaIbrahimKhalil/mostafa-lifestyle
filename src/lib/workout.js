@@ -99,7 +99,7 @@ export const ROUTINES = {
   A: { name: 'حديد A', exercises: ['legpress', 'chestpress', 'latpulldown', 'shoulderpress', 'plank'], cardio: 20 },
   B: { name: 'حديد B', exercises: ['goblet', 'seatedrow', 'inclinedb', 'legcurl', 'abcrunch'], cardio: 20 },
   cardio: { name: 'كارديو', exercises: [], cardio: 40, walk: 60 },
-  walk: { name: 'مشي', exercises: [], walk: 60, optional: true },
+  walk: { name: 'مشي', exercises: [], walk: 60 },
 }
 
 export const CARDIO_KINDS = [
@@ -109,8 +109,8 @@ export const CARDIO_KINDS = [
   ['bike', 'عجلة'],
 ]
 
-// الجدول الافتراضي: السبت مشي، الحد A، التلات كارديو، الخميس B، والجمعة راحة
-export const DEFAULT_GYM_DAYS = { 6: 'walk', 0: 'A', 2: 'cardio', 4: 'B' }
+// الجدول الافتراضي: كل يوم — حديد الحد والخميس، كارديو التلات، ومشي باقي الأيام
+export const DEFAULT_GYM_DAYS = { 6: 'walk', 0: 'A', 1: 'walk', 2: 'cardio', 3: 'walk', 4: 'B', 5: 'walk' }
 export const DEFAULT_GYM_TIME = '17:00'
 
 export const WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5]

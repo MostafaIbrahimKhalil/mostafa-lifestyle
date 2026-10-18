@@ -8,6 +8,7 @@ import { backupDue } from './backup.js'
 import { lessonTitle, todayPlan } from './hifz.js'
 import { obligationsFor } from './wallet.js'
 import { isSunnahFastDay, waterPlan } from './water.js'
+import { remindersFor } from './reminders.js'
 
 export const PUSH_URL = 'https://mostafa-push.ui-designer-mostafa-ibrahim.workers.dev'
 const MIN = 60 * 1000
@@ -213,6 +214,16 @@ export async function buildSchedule(settings, now = new Date()) {
         if (i === 0 && isSunnahFastDay(next) && !has(nk, 'fast:yes') && !has(nk, 'fast:no')) {
           push(timeOnDay(day, '21:30'), `بكرة ${next.getDay() === 1 ? 'الاتنين' : 'الخميس'}: هتصوم؟`, 'افتح التطبيق وقرر، عشان المية والسحور يتظبطوا', `fast-ask-${nk}`, null, 0)
         }
+      }
+    }
+  }
+  // التذكيرات اللي إنت ضفتها (مرة واحدة أو كل أسبوع) — بتوصل في ساعتها بالظبط
+  {
+    const all = await db.reminders.toArray()
+    for (let i = 0; i < 2; i++) {
+      const day = addDays(today, i)
+      for (const r of remindersFor(all, dateKey(day), day.getDay())) {
+        if (r.at) push(timeOnDay(day, r.at), r.title, 'تذكير', `rem-${r.id}-${dateKey(day)}`, null, i)
       }
     }
   }
