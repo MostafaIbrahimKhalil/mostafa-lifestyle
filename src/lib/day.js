@@ -1,6 +1,6 @@
 import { PRAYERS, prayerTimesFor } from './prayer.js'
 import { timeOnDay } from './dates.js'
-import { DEFAULT_GYM_TIME, isGymDay, routineFor } from './workout.js'
+import { gymTimeFor, isGymDay, routineFor } from './workout.js'
 
 const MIN = 60 * 1000
 
@@ -97,7 +97,7 @@ export function buildDay(day, settings) {
       title: routine.name,
       routine,
       icon: 'dumbbell',
-      time: timeOnDay(day, settings.gymTime || DEFAULT_GYM_TIME),
+      time: gymTimeFor(day, settings, times),
     })
   }
 

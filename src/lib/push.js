@@ -3,7 +3,7 @@ import { db, getSetting, setSetting } from '../db.js'
 import { addDays, dateKey, logicalDate, timeOnDay } from './dates.js'
 import { DEFAULT_SLEEP } from './day.js'
 import { PRAYERS, prayerTimesFor } from './prayer.js'
-import { DEFAULT_GYM_TIME, routineFor } from './workout.js'
+import { gymTimeFor, routineFor } from './workout.js'
 import { backupDue } from './backup.js'
 import { lessonTitle, todayPlan } from './hifz.js'
 import { obligationsFor } from './wallet.js'
@@ -89,7 +89,7 @@ export async function buildSchedule(settings, now = new Date()) {
     }
     const routine = routineFor(day, settings)
     if (prefs.gym && routine && !routine.optional) {
-      const at = timeOnDay(day, settings.gymTime || DEFAULT_GYM_TIME)
+      const at = gymTimeFor(day, settings, t)
       push(new Date(at.getTime() - 30 * MIN), `${routine.name} بعد نص ساعة 💪`, 'جهّز هدومك ومية', 'gym', 'gym', i)
     }
   }

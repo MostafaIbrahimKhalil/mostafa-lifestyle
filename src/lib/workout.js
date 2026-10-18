@@ -113,6 +113,13 @@ export const CARDIO_KINDS = [
 export const DEFAULT_GYM_DAYS = { 6: 'walk', 0: 'A', 1: 'walk', 2: 'cardio', 3: 'walk', 4: 'B', 5: 'walk' }
 export const DEFAULT_GYM_TIME = '17:00'
 
+// ميعاد الجيم: بعد العشا بنص ساعة (الافتراضي)، أو ساعة ثابتة لو قفلت "بعد العشا"
+export function gymTimeFor(day, settings, times) {
+  if (settings.gymAfterIsha !== false && times?.isha) return new Date(times.isha.getTime() + 30 * 60 * 1000)
+  const [h, m] = (settings.gymTime || DEFAULT_GYM_TIME).split(':').map(Number)
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m)
+}
+
 export const WEEK_ORDER = [6, 0, 1, 2, 3, 4, 5]
 export const DAY_NAMES = { 6: 'السبت', 0: 'الحد', 1: 'الاتنين', 2: 'التلات', 3: 'الأربع', 4: 'الخميس', 5: 'الجمعة' }
 

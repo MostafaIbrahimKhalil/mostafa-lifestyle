@@ -12,7 +12,7 @@ export async function seedPlan() {
     db.tasks
       .filter((t) => t.plan === 'german-words')
       .modify((t) => {
-        t.title = 'كروت الألماني التعليمية: ساعة (٧–٨ بالليل)'
+        t.title = GERMAN_WORDS_TASKS[0].title
       }),
   )
   await seedOnce('seededBlender', async () => {
@@ -28,6 +28,16 @@ export async function seedPlan() {
       .modify((t) => {
         t.at = BLENDER_TASKS[0].at
         t.title = BLENDER_TASKS[0].title
+      }),
+  )
+  // الجيم بقى بعد العشا: البليندر رجع العصر، والكروت بقت ٥:٣٠
+  await seedOnce('timesAfterIshaGym', () =>
+    db.tasks
+      .filter((t) => t.plan === 'blender-home' || t.plan === 'german-words')
+      .modify((t) => {
+        const src = t.plan === 'blender-home' ? BLENDER_TASKS[0] : GERMAN_WORDS_TASKS[0]
+        t.at = src.at
+        t.title = src.title
       }),
   )
   if (await getSetting('seededPlan2026', false)) return

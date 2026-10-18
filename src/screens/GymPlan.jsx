@@ -45,14 +45,25 @@ export default function GymPlan({ settings }) {
           </label>
         ))}
         <label className="field field-row">
-          <span>معاد الجيم</span>
+          <span>بعد العشا بنص ساعة</span>
           <input
-            className="input input-small"
-            type="time"
-            value={settings.gymTime || DEFAULT_GYM_TIME}
-            onChange={(e) => e.target.value && setSetting('gymTime', e.target.value)}
+            type="checkbox"
+            className="switch"
+            checked={settings.gymAfterIsha !== false}
+            onChange={(e) => setSetting('gymAfterIsha', e.target.checked)}
           />
         </label>
+        {settings.gymAfterIsha === false && (
+          <label className="field field-row">
+            <span>معاد الجيم</span>
+            <input
+              className="input input-small"
+              type="time"
+              value={settings.gymTime || DEFAULT_GYM_TIME}
+              onChange={(e) => e.target.value && setSetting('gymTime', e.target.value)}
+            />
+          </label>
+        )}
       </section>
 
       {['A', 'B'].map((rid) => (
