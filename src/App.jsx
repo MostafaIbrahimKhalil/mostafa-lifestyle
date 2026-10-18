@@ -37,10 +37,21 @@ export default function App() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, reg) {
-      // يشيك على تحديث كل ساعة طول ما التطبيق مفتوح
-      if (reg) setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000)
+      if (!reg) return
+      // يشيك على تحديث أول ما التطبيق يتفتح، ولما يرجع من الخلفية، وكل ساعة
+      reg.update().catch(() => {})
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {})
+      })
+      setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000)
     },
   })
+
+  // التحديث بيتطبّق لوحده لو التطبيق لسه مفتوح من أقل من دقيقة (يعني لسه فاتحه)
+  const openedAt = useRef(Date.now())
+  useEffect(() => {
+    if (needRefresh && Date.now() - openedAt.current < 60 * 1000) updateServiceWorker(true)
+  }, [needRefresh, updateServiceWorker])
 
   useEffect(() => {
     requestPersistentStorage()
