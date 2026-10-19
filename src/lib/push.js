@@ -56,6 +56,9 @@ async function getSubscription(create) {
 }
 
 // جدول التذكيرات من دلوقتي لحد آخر بكرة — من غير الحاجات اللي اتعملت النهارده
+// ٣ أيام: لو ما فتحتش التطبيق يوم كامل الإشعارات تفضل شغالة
+const SCHEDULE_DAYS = 3
+
 export async function buildSchedule(settings, now = new Date()) {
   const prefs = notifyPrefs(settings)
   const today = logicalDate(now)
@@ -69,7 +72,7 @@ export async function buildSchedule(settings, now = new Date()) {
     items.push({ at: at.getTime(), title, body, tag })
   }
 
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < SCHEDULE_DAYS; i++) {
     const day = addDays(today, i)
     const t = prayerTimesFor(day, settings.location || undefined)
     for (const p of PRAYERS) {
@@ -102,7 +105,7 @@ export async function buildSchedule(settings, now = new Date()) {
     const rows = settings.hifzEnabled !== false ? await db.hifzLessons.toArray() : []
     const pace = settings.hifzPace || 'everyOther'
     const k0 = dateKey(today)
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
       const t = prayerTimesFor(day, settings.location || undefined)
       const slot = settings.wirdSlot || 'fajr'
@@ -125,7 +128,7 @@ export async function buildSchedule(settings, now = new Date()) {
   // الالتزامات: تذكير بالليل قبل معادها بيوم، ويوم المعاد الصبح
   if (prefs.bills) {
     const [obligations, txns] = await Promise.all([db.obligations.toArray(), db.txns.where('obligationId').above(0).toArray()])
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
       const next = addDays(day, 1)
       for (const k of [dateKey(day), dateKey(next)]) {
@@ -154,7 +157,7 @@ export async function buildSchedule(settings, now = new Date()) {
       db.posts.where('date').between(t0, t2, true, true).toArray(),
       db.tasks.where('date').between(t0, t1, true, true).toArray(),
     ])
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
       const k = dateKey(day)
       const next = dateKey(addDays(day, 1))
@@ -189,7 +192,7 @@ export async function buildSchedule(settings, now = new Date()) {
     const items = await db.checks.where('date').anyOf(k0, k1).toArray()
     const has = (k, item) => items.some((c) => c.date === k && c.item === item)
     const count = items.find((c) => c.date === k0 && c.item === 'water:count')?.value || 0
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
       const k = i ? k1 : k0
       const fasting = has(k, 'fast:yes')
@@ -217,7 +220,7 @@ export async function buildSchedule(settings, now = new Date()) {
   // التذكيرات اللي إنت ضفتها (مرة واحدة أو كل أسبوع) — بتوصل في ساعتها بالظبط
   {
     const all = await db.reminders.toArray()
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
       for (const r of remindersFor(all, dateKey(day), day.getDay())) {
         if (r.at) push(timeOnDay(day, r.at), r.title, 'تذكير', `rem-${r.id}-${dateKey(day)}`, null, i)
@@ -226,7 +229,7 @@ export async function buildSchedule(settings, now = new Date()) {
   }
   // التقرير: الخميس ٩ وربع بالليل، وأول الشهر
   if (prefs.report) {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
       if (day.getDay() === 4) push(timeOnDay(day, '21:15'), 'تقرير الأسبوع جاهز', 'افتح تقدّمي ← تقرير الأسبوع، وانسخه لكلود', `report-w-${dateKey(day)}`, null, i)
       if (day.getDate() === 1) push(timeOnDay(day, '10:00'), 'تقرير الشهر جاهز', 'افتح تقدّمي ← تقرير الشهر، وانسخه لكلود', `report-m-${dateKey(day)}`, null, i)
@@ -234,7 +237,7 @@ export async function buildSchedule(settings, now = new Date()) {
   }
   // تذكير بالنسخة الاحتياطية الساعة ٩ بالليل لو مستحقة
   if (backupDue(settings, now)) {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const at = timeOnDay(addDays(today, i), '21:00')
       if (at > now) {
         items.push({ at: at.getTime(), title: 'نسخة احتياطية', body: 'افتح التطبيق واعمل نسخة احتياطية لبياناتك 🔒', tag: 'backup' })
@@ -266,16 +269,37 @@ export async function enablePush(settings) {
 export async function sync(settings, existing = null) {
   if (!pushSupported() || Notification.permission !== 'granted') return null
   const sub = existing || (await getSubscription(false))
-  if (!sub) return null
-  const schedule = await buildSchedule(settings)
-  const res = await fetch(`${PUSH_URL}/subscribe`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ subscription: sub.toJSON(), schedule }),
-    keepalive: true,
-  }).then((r) => r.json())
-  await setSetting('pushLastSync', new Date().toISOString())
-  return res
+  if (!sub) {
+    if (settings.pushEnabled) await setSetting('pushLastError', 'الاشتراك اتشال من الآيفون — دوس "صلّح الإشعارات"')
+    return null
+  }
+  try {
+    const schedule = await buildSchedule(settings)
+    const res = await fetch(`${PUSH_URL}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON(), schedule }),
+      keepalive: true,
+    }).then((r) => r.json())
+    if (res?.error) throw new Error(res.error)
+    await setSetting('pushLastSync', new Date().toISOString())
+    await setSetting('pushLastError', null)
+    await setSetting('pushNext', schedule[0] ? { at: schedule[0].at, title: schedule[0].title } : null)
+    await setSetting('pushScheduled', res?.scheduled ?? schedule.length)
+    return res
+  } catch (err) {
+    await setSetting('pushLastError', `ما قدرش يوصل للسيرفر (${err?.message || err})`)
+    throw err
+  }
+}
+
+// تصليح: نلغي الاشتراك القديم ونعمل واحد جديد ونبعت إشعار تجربة
+export async function repairPush(settings) {
+  if (!pushSupported()) throw new Error('الإشعارات مش مدعومة هنا. افتح التطبيق من الأيقونة اللي على الشاشة الرئيسية')
+  const reg = await navigator.serviceWorker.ready
+  const old = await reg.pushManager.getSubscription()
+  if (old) await old.unsubscribe().catch(() => {})
+  return enablePush(settings)
 }
 
 export async function pushEnabled() {

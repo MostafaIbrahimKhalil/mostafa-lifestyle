@@ -485,10 +485,16 @@ function DayStrip({ day, base, onPick }) {
     return { set, weekly: new Set(rems.filter((r) => r.active !== false && !r.date).map((r) => r.weekday)) }
   }, [from, to])
 
+  // نحرّك الشريط بالعرض بس، من غير ما الصفحة نفسها تتحرك لفوق
+  const dk = dateKey(day)
   useEffect(() => {
-    const el = ref.current?.querySelector('.is-sel')
-    if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-  }, [day])
+    const box = ref.current
+    const el = box?.querySelector('.is-sel')
+    if (!el) return
+    const a = el.getBoundingClientRect()
+    const b = box.getBoundingClientRect()
+    box.scrollBy({ left: a.left + a.width / 2 - (b.left + b.width / 2), behavior: 'smooth' })
+  }, [dk])
 
   const baseKey = dateKey(base)
   const days = Array.from({ length: count }, (_, i) => new Date(y, m, i + 1))
@@ -755,48 +761,36 @@ function FoodBlock({ checkedSet, checked, today, day, now, settings, fasting }) 
             <CheckButton done={checkedSet.has('clean')} onToggle={(d) => setCheck(today, 'clean', d)} label="من غير حاجات تزوّد" />
           </li>
         </ul>
-        <div className="water">
-          <div className="row-between">
+        <div className="water water-compact">
+          <button className="icon-btn water-minus" onClick={() => addWater(-1)} disabled={!water} aria-label="شيل كوباية">
+            −
+          </button>
+          <div className="water-mid">
             <span>
-              المية: <strong>{num(water)}</strong> من {num(WATER_TARGET)} كوباية
+              المية <strong>{num(water)}</strong>/{num(WATER_TARGET)}
             </span>
-            <small className="muted">{num(((water * 250) / 1000).toFixed(2).replace(/\.?0+$/, ''))} لتر</small>
+            <small className={ws.behind > 0 ? 'late' : 'muted'}>
+              {water >= WATER_TARGET
+                ? 'خلّصت مية النهارده ✓'
+                : ws.behind > 0
+                  ? `متأخر ${num(ws.behind)} ${ws.behind === 1 ? 'كوباية' : 'كوبايات'}`
+                  : ws.next
+                    ? `الجاية ${formatTime(ws.next.at)}`
+                    : ''}
+            </small>
+            <span className="bar bar-thin water-bar">
+              <span style={{ width: `${Math.min(1, water / WATER_TARGET) * 100}%` }} />
+            </span>
           </div>
-          <ul className="water-plan">
-            {plan.map((p, i) => {
-              const done = water >= p.sum
-              const late = !done && p.at <= now
-              return (
-                <li key={i} className={done ? 'is-done' : late ? 'is-late' : p === ws.next ? 'is-next' : ''}>
-                  <span className="wp-time">{formatTime(p.at)}</span>
-                  <span className="wp-label">{p.label}</span>
-                  <span className="wp-cups">{done ? '✓' : `${num(p.cups)} ${p.cups === 1 ? 'كوباية' : 'كوبايات'}`}</span>
-                </li>
-              )
-            })}
-          </ul>
-          {ws.behind > 0 && <small className="late">متأخر {num(ws.behind)} {ws.behind === 1 ? 'كوباية' : 'كوبايات'} عن التقسيمة</small>}
-          <div className="water-cups" aria-hidden="true">
-            {Array.from({ length: WATER_TARGET }, (_, i) => (
-              <span key={i} className={`cup ${i < water ? 'on' : ''}`} />
-            ))}
-          </div>
-          <div className="row">
-            <button className="btn" onClick={() => addWater(1)}>
-              + كوباية
-            </button>
-            {water > 0 && (
-              <button className="btn btn-ghost" onClick={() => addWater(-1)}>
-                −
-              </button>
-            )}
-          </div>
-          {!fasting && !checkedSet.has('fast:no') && !isSunnahFastDay(day) && (
-            <button className="link-btn" onClick={() => setFast(today, true)}>
-              صايم النهارده؟
-            </button>
-          )}
+          <button className="btn water-plus" onClick={() => addWater(1)}>
+            + كوباية
+          </button>
         </div>
+        {!fasting && !checkedSet.has('fast:no') && !isSunnahFastDay(day) && (
+          <button className="link-btn" onClick={() => setFast(today, true)}>
+            صايم النهارده؟
+          </button>
+        )}
       </div>
     </li>
   )

@@ -4,7 +4,8 @@ import { importBackup, setSetting } from '../db.js'
 import { backupDue, shareBackup } from '../lib/backup.js'
 import { formatShortDate, num } from '../lib/dates.js'
 import { getDeviceLocation } from '../lib/prayer.js'
-import { enablePush, notifyPrefs, sync } from '../lib/push.js'
+import { enablePush, notifyPrefs, repairPush, sync } from '../lib/push.js'
+import PushStatus from '../components/PushStatus.jsx'
 import { isIOS, isStandalone, notificationStatus } from '../lib/device.js'
 
 export default function Settings({ settings }) {
@@ -51,6 +52,19 @@ export default function Settings({ settings }) {
     } catch (err) {
       setNotif(notificationStatus())
       flash(err?.message || 'حصلت مشكلة في الإشعارات، جرّب تاني', 'warn')
+    }
+    setPushBusy(false)
+  }
+
+  async function repair() {
+    setPushBusy(true)
+    try {
+      await repairPush(settings)
+      setNotif(notificationStatus())
+      flash('اتعمل اشتراك جديد ✓ هيوصلك إشعار تجربة دلوقتي')
+    } catch (err) {
+      setNotif(notificationStatus())
+      flash(err?.message || 'حصلت مشكلة، جرّب تاني', 'warn')
     }
     setPushBusy(false)
   }
@@ -224,6 +238,7 @@ export default function Settings({ settings }) {
             {pushBusy ? 'بنفعّل…' : notif === 'granted' && settings.pushEnabled ? 'ابعت إشعار تجربة' : 'شغّل الإشعارات'}
           </button>
         )}
+        <PushStatus settings={settings} notif={notif} standalone={standalone} busy={pushBusy} onRepair={repair} />
         {[
           ['prayerAt', 'الصلاة: إشعار واحد وقت الأذان'],
           ['prayerBefore', 'كمان تنبيه قبل الأذان بـ ١٠ دقايق'],

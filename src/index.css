@@ -3724,3 +3724,65 @@ details[open] > summary.bal-head::after {
 .agenda-list .task-meta small {
   color: var(--muted);
 }
+
+/* المية في سطر واحد */
+.water.water-compact {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.water-mid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.water-mid small {
+  font-size: 12px;
+}
+.water-bar {
+  flex: none;
+  height: 5px;
+}
+.water-bar > span {
+  background: var(--c-work);
+}
+.water-minus {
+  font-size: 22px;
+  width: 38px;
+  height: 38px;
+}
+.water-minus:disabled {
+  opacity: 0.3;
+}
+.water-plus {
+  white-space: nowrap;
+}
+
+.push-status ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+.push-status li span {
+  display: inline-block;
+  width: 18px;
+  font-weight: 700;
+}
+.push-status li.ok span {
+  color: var(--c-faith);
+}
+.push-status li.bad {
+  color: var(--c-health);
+}
+.push-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
