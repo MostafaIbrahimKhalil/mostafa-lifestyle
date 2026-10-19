@@ -26,13 +26,14 @@ export function groupTasks(all, today) {
   return { daily, today: todayList, upcoming }
 }
 
-export async function addTask({ title, kind, category, priority, date }) {
+export async function addTask({ title, kind, category, priority, date, at }) {
   return db.tasks.add({
     kind,
     title,
     category,
     priority: priority || 2,
     date,
+    ...(at ? { at } : {}),
     done: false,
     active: true,
     createdAt: new Date().toISOString(),

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getSetting, requestPersistentStorage, seedDefaults, setSetting } from './db.js'
-import { ASPECTS } from './aspects.js'
 import { useSettings } from './hooks.js'
 import { todayKey } from './lib/dates.js'
 import { sync } from './lib/push.js'
@@ -92,7 +91,15 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
-  function switchTab(id) {
+  // النتيجة ← افتح يوم معيّن في صفحة اليوم
+  const [jump, setJump] = useState(null)
+  const [tasksView, setTasksView] = useState('list')
+
+  function switchTab(id, keep = false) {
+    if (!keep) {
+      setJump(null)
+      setTasksView('list')
+    }
     setTab(id)
     setSub(null)
     window.scrollTo({ top: 0 })
@@ -130,12 +137,15 @@ export default function App() {
         <main className="screen" key={`${tab}-${sub}`}>
           {tab === 'today' && <Today
               settings={settings}
-              aspects={ASPECTS}
+              jumpTo={jump}
               onOpenTasks={() => switchTab('tasks')}
+              onOpenAgenda={() => (setTasksView('agenda'), switchTab('tasks', true))}
               onOpenHifz={openHifz}
               onOpenSub={openFromAnywhere}
             />}
-          {tab === 'tasks' && <Tasks />}
+          {tab === 'tasks' && (
+            <Tasks settings={settings} initialView={tasksView} onOpenDay={(k) => (setJump(k), switchTab('today', true))} />
+          )}
           {tab === 'progress' && (
             <Progress settings={settings} onOpenHifz={openHifz} onOpenWork={() => (setTab('more'), setSub('work'))} />
           )}

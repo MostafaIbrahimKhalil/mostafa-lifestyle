@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Icon from '../components/Icon.jsx'
-import { AddTaskForm, TaskItem } from '../components/TaskParts.jsx'
+import { TaskItem } from '../components/TaskParts.jsx'
+import Agenda from '../components/Agenda.jsx'
+import QuickAddSheet from '../components/QuickAddSheet.jsx'
 import { db } from '../db.js'
 import { useNow } from '../hooks.js'
 import { formatShortDate, fromKey, num, todayKey } from '../lib/dates.js'
@@ -9,13 +11,14 @@ import { TASK_CATS, catOf, groupTasks } from '../lib/tasks.js'
 
 const FILTERS = [['all', 'الكل'], ...Object.entries(TASK_CATS).map(([id, c]) => [id, c.label])]
 
-export default function Tasks() {
+export default function Tasks({ settings, initialView = 'list', onOpenDay }) {
   const now = useNow()
   const today = todayKey(now)
   const [filter, setFilter] = useState('all')
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
   const [showDone, setShowDone] = useState(false)
+  const [view, setView] = useState(initialView)
 
   const all = useLiveQuery(() => db.tasks.toArray(), [])
   const checks = useLiveQuery(() => db.checks.where('date').equals(today).toArray(), [today])
@@ -60,6 +63,19 @@ export default function Tasks() {
         )}
       </header>
 
+      <div className="seg" role="tablist" aria-label="العرض">
+        <button className={view === 'list' ? 'is-on' : ''} onClick={() => setView('list')}>
+          <Icon name="list" size={17} /> القايمة
+        </button>
+        <button className={view === 'agenda' ? 'is-on' : ''} onClick={() => setView('agenda')}>
+          <Icon name="calendar" size={17} /> النتيجة
+        </button>
+      </div>
+
+      {view === 'agenda' ? (
+        <Agenda today={today} settings={settings} onOpenDay={onOpenDay} />
+      ) : (
+      <>
       <div className="phrase-scroll" role="radiogroup" aria-label="فلتر">
         {FILTERS.map(([id, label]) => (
           <button key={id} className={`chip ${filter === id ? 'chip-on' : ''}`} onClick={() => setFilter(id)}>
@@ -68,14 +84,11 @@ export default function Tasks() {
         ))}
       </div>
 
-      {adding ? (
-        <AddTaskForm today={today} onClose={() => setAdding(false)} defaultCategory={filter === 'all' ? 'work' : filter} />
-      ) : (
-        <button className="btn btn-wide" onClick={() => setAdding(true)}>
-          <Icon name="plus" size={20} />
-          مهمة جديدة
-        </button>
-      )}
+      <button className="btn btn-wide" onClick={() => setAdding(true)}>
+        <Icon name="plus" size={20} />
+        ضيف مهمة أو تذكير
+      </button>
+      {adding && <QuickAddSheet date={today} today={today} settings={settings} onClose={() => setAdding(false)} defaultCategory={filter === 'all' ? 'personal' : filter} />}
 
       <TaskSection title="النهارده" empty="مفيش مهام النهارده. استمتع 🌿" count={pending.length}>
         {pending.map((t) => (
@@ -128,6 +141,8 @@ export default function Tasks() {
             </ul>
           )}
         </section>
+      )}
+      </>
       )}
     </>
   )

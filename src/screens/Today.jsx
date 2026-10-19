@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import BalanceRing from '../components/BalanceRing.jsx'
+import QuickAddSheet from '../components/QuickAddSheet.jsx'
 import Icon from '../components/Icon.jsx'
 import TasbihSheet from '../components/TasbihSheet.jsx'
 import { db, setCheck, setSetting } from '../db.js'
 import { useNow } from '../hooks.js'
-import { buildDay, currentPrayer, progressFor } from '../lib/day.js'
-import { addTask, groupTasks } from '../lib/tasks.js'
-import { addReminder, remindersFor } from '../lib/reminders.js'
-import { sync } from '../lib/push.js'
+import { buildDay, currentPrayer } from '../lib/day.js'
+import { groupTasks } from '../lib/tasks.js'
+import { remindersFor } from '../lib/reminders.js'
 import { CheckButton, TaskItem } from '../components/TaskParts.jsx'
 import {
   addDays,
@@ -18,6 +17,7 @@ import {
   formatHijri,
   formatShortDate,
   formatTime,
+  fromKey,
   greeting,
   logicalDate,
   minutesBetween,
@@ -82,11 +82,15 @@ function PlanToday({ today, isToday, onOpenSub }) {
   )
 }
 
-export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOpenSub }) {
+export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz, onOpenSub, jumpTo }) {
   const realNow = useNow()
-  const [offset, setOffset] = useState(0) // ٠ = النهارده، سالب = أيام فاتت، موجب = أيام جاية
+  const [offset, setOffset] = useState(() =>
+    jumpTo ? Math.round((fromKey(jumpTo) - fromKey(todayKey(realNow))) / 86400000) : 0,
+  )
+  const [quickAdd, setQuickAdd] = useState(false) // ٠ = النهارده، سالب = أيام فاتت، موجب = أيام جاية
   const isToday = offset === 0
   const isFuture = offset > 0
+  const isPast = offset < 0
   const day = addDays(logicalDate(realNow), offset)
   const today = isToday ? todayKey(realNow) : dateKey(day)
   // يوم فات: اليوم كله خلص. يوم جاي: لسه ما بدأش
@@ -112,11 +116,15 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
   const { rows, times } = buildDay(day, settings)
   const checked = useMemo(() => new Map((checks || []).map((c) => [c.item, c])), [checks])
   const checkedSet = useMemo(() => new Set(checked.keys()), [checked])
-  const g = useMemo(() => groupTasks(allTasks || [], today), [allTasks, today])
+  const g = useMemo(() => {
+    const x = groupTasks(allTasks || [], today)
+    // يوم جاي: مهام اليوم ده بس (المتأخرة بتظهر النهارده)
+    if (isFuture) x.today = x.today.filter((t) => t.date === today)
+    return x
+  }, [allTasks, today, isFuture])
 
   const workTotal = g.daily.length + g.today.length
   const workDone = g.daily.filter((t) => checkedSet.has(`task:${t.id}`)).length + g.today.filter((t) => t.done).length
-  const progress = progressFor(checkedSet, settings, workTotal, workDone, day)
   const curPrayer = isToday ? currentPrayer(times, now) : null
   const excused = checkedSet.has('day:excused')
   const fasting = checkedSet.has('fast:yes')
@@ -171,6 +179,9 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
         </button>
       </div>
       <DayStrip day={day} base={logicalDate(realNow)} onPick={setOffset} />
+      <button className="link-btn agenda-link" onClick={onOpenAgenda}>
+        <Icon name="calendar" size={16} /> النتيجة لحد آخر السنة
+      </button>
 
       {offset < 0 && <p className="muted center">يوم فات — لو نسيت تعلّم حاجة علّمها هنا.</p>}
       {isFuture && <p className="muted center">يوم جاي: شوف عليك إيه، وضيف تذكير أو مهمة.</p>}
@@ -204,38 +215,16 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
         </button>
       )}
 
-      <section className="card balance">
-        <div className="balance-row">
-          <BalanceRing
-            aspects={aspects}
-            progress={progress.aspects}
-            centerValue={`${num(Math.round(progress.overall * 100))}٪`}
-            centerLabel={dayLabel}
-          />
-          <ul className="legend legend-col">
-            {aspects.map((a) => (
-              <li key={a.id} className={a.soon ? 'is-soon' : ''}>
-                <span className="swatch" style={{ background: a.color }} />
-                <span>{a.name}</span>
-                <span className="legend-val">
-                  {a.soon ? 'قريبًا' : `${num(Math.round((progress.aspects[a.id] || 0) * 100))}٪`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        {next && (
-          <p className="next-up">
-            <span className="next-dot" />
-            اللي جاي: <strong>{next.title}</strong> {formatTime(next.time)}، باقي{' '}
-            {formatDuration(minutesBetween(now, next.time))}
-          </p>
-        )}
-      </section>
+      {next && (
+        <p className="card next-up next-up-card">
+          <span className="next-dot" />
+          اللي جاي: <strong>{next.title}</strong> {formatTime(next.time)}، باقي {formatDuration(minutesBetween(now, next.time))}
+        </p>
+      )}
 
       <PlanToday today={today} isToday={isToday} onOpenSub={onOpenSub} />
 
-      <DayReminders dateK={today} weekday={day.getDay()} label={dayLabel} settings={settings} />
+      <DayReminders dateK={today} weekday={day.getDay()} label={dayLabel} onAdd={() => setQuickAdd(true)} />
 
       <FastCard
         day={day}
@@ -384,6 +373,12 @@ export default function Today({ settings, aspects, onOpenTasks, onOpenHifz, onOp
           }}
         />
       )}
+      {!isPast && !overlay && (
+        <button className="fab" onClick={() => setQuickAdd(true)} aria-label="ضيف مهمة أو تذكير">
+          <Icon name="plus" size={26} stroke={2.2} />
+        </button>
+      )}
+      {quickAdd && <QuickAddSheet date={today} today={todayKey(realNow)} settings={settings} onClose={() => setQuickAdd(false)} />}
     </>
   )
 }
@@ -555,25 +550,10 @@ function FutureFast({ day, today, checkedSet }) {
 }
 
 // تذكيرات اليوم: بإشعار في الساعة اللي تحددها، مرة واحدة أو كل أسبوع — وممكن تضيف مهمة لليوم ده
-function DayReminders({ dateK, weekday, label, settings }) {
+function DayReminders({ dateK, weekday, label, onAdd }) {
   const all = useLiveQuery(() => db.reminders.toArray(), [])
-  const [adding, setAdding] = useState(false)
-  const [kind, setKind] = useState('reminder') // reminder | task
-  const [title, setTitle] = useState('')
-  const [at, setAt] = useState('20:00')
-  const [weekly, setWeekly] = useState(false)
   if (!all) return null
   const list = remindersFor(all, dateK, weekday)
-
-  async function save(e) {
-    e.preventDefault()
-    if (!title.trim()) return
-    if (kind === 'task') await addTask({ title: title.trim(), kind: 'once', category: 'personal', priority: 2, date: dateK })
-    else await addReminder({ title: title.trim(), at, date: dateK, weekly, weekday })
-    setTitle('')
-    setAdding(false)
-    sync(settings).catch(() => {})
-  }
 
   return (
     <section className="card reminders">
@@ -600,43 +580,9 @@ function DayReminders({ dateK, weekday, label, settings }) {
           ))}
         </ul>
       )}
-      {adding ? (
-        <form className="add-task" onSubmit={save}>
-          <div className="seg seg-small">
-            <button type="button" className={kind === 'reminder' ? 'is-on' : ''} onClick={() => setKind('reminder')}>
-              تذكير بإشعار
-            </button>
-            <button type="button" className={kind === 'task' ? 'is-on' : ''} onClick={() => setKind('task')}>
-              مهمة لليوم ده
-            </button>
-          </div>
-          <input className="input" placeholder={kind === 'task' ? 'المهمة' : 'فكّرني بإيه؟'} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={70} autoFocus />
-          {kind === 'reminder' && (
-            <>
-              <label className="field field-row">
-                <span>الساعة</span>
-                <input className="input input-small" type="time" value={at} onChange={(e) => e.target.value && setAt(e.target.value)} />
-              </label>
-              <label className="field field-row">
-                <span>كل {DAY_LABEL[weekday]}</span>
-                <input type="checkbox" className="switch" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} />
-              </label>
-            </>
-          )}
-          <div className="row">
-            <button className="btn" type="submit">
-              ضيف
-            </button>
-            <button className="btn btn-ghost" type="button" onClick={() => setAdding(false)}>
-              إلغاء
-            </button>
-          </div>
-        </form>
-      ) : (
-        <button className="link-btn add-reminder" onClick={() => setAdding(true)}>
-          <Icon name="plus" size={16} /> تذكير أو مهمة {label === 'النهارده' ? 'للنهارده' : label === 'بكرة' ? 'لبكرة' : 'لليوم ده'}
-        </button>
-      )}
+      <button className="link-btn add-reminder" onClick={onAdd}>
+        <Icon name="plus" size={16} /> ضيف مهمة أو تذكير {label === 'النهارده' ? 'للنهارده' : label === 'بكرة' ? 'لبكرة' : 'لليوم ده'}
+      </button>
     </section>
   )
 }
@@ -861,7 +807,7 @@ function TasksBlock({ g, checkedSet, today, total, done, onOpen }) {
   const pending = [
     ...g.today.filter((t) => !t.done),
     ...g.daily.filter((t) => !checkedSet.has(`task:${t.id}`)),
-  ].slice(0, 4)
+  ].slice(0, 12)
   const more = total - done - pending.length
 
   return (
