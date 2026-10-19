@@ -5,6 +5,7 @@ import BodyWeight from '../components/BodyWeight.jsx'
 import BalanceReport from '../components/BalanceReport.jsx'
 import ReportCard from '../components/ReportCard.jsx'
 import QuranCard from '../components/QuranCard.jsx'
+import ProgressCharts from '../components/ProgressCharts.jsx'
 import { lessonTitle, summary as hifzSummary, todayPlan } from '../lib/hifz.js'
 import { clientLedger, money, monthStats } from '../lib/work.js'
 import { monthKey } from '../lib/dates.js'
@@ -65,6 +66,8 @@ export default function Progress({ settings, onOpenHifz, onOpenWork }) {
         <h1>تقدّمي</h1>
         <p className="muted">إنت وصلت فين، واتعودت على إيه، وناقصك إيه</p>
       </header>
+
+      <ProgressCharts settings={settings} checks={checks} tasks={tasks} />
 
       <div className="stat-row">
         <div className="stat">

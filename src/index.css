@@ -3295,3 +3295,239 @@ details[open] > summary.bal-head::after {
   color: var(--muted);
   line-height: 1.9;
 }
+
+/* ===== رسومات تقدّمي ===== */
+.period-seg {
+  flex-shrink: 0;
+}
+.chart-card {
+  gap: 10px;
+}
+.chart-chips {
+  gap: 6px;
+}
+.chart-chips .chip {
+  padding: 6px 11px;
+}
+.chart-chips .chip .swatch {
+  width: 8px;
+  height: 8px;
+}
+.daybars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chart-readout {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  min-height: 22px;
+}
+.chart-readout strong {
+  font-variant-numeric: tabular-nums;
+}
+.chart-svg {
+  direction: ltr;
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: pan-y;
+  overflow: visible;
+}
+.chart-svg path {
+  transition: fill-opacity 0.15s;
+}
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.chart-target {
+  stroke: var(--muted);
+  stroke-width: 1;
+  opacity: 0.8;
+}
+.chart-cursor {
+  stroke: var(--muted);
+  stroke-width: 1;
+  opacity: 0.35;
+}
+.chart-tick,
+.chart-x {
+  fill: var(--muted);
+  font-size: 10px;
+  font-family: inherit;
+}
+.chart-x.is-sel {
+  fill: var(--text);
+  font-weight: 700;
+}
+.chart-empty {
+  text-align: center;
+}
+.chart-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend .swatch {
+  outline: 1px solid var(--line);
+}
+.stack-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stack-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.stack-bar {
+  display: flex;
+  height: 14px;
+  gap: 2px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.stack-bar > span {
+  min-width: 3px;
+}
+.stack-empty {
+  flex: 1;
+  background: var(--surface-2);
+}
+.stack-val,
+.cat-val {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cat-bars {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.cat-bars li {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.cat-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cat-track {
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cat-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.legend-val small {
+  font-size: 11px;
+}
+
+/* ===== التمرير التلقائي (تيليبرومبتر) ===== */
+.reader-bar,
+.reader-progress {
+  position: relative;
+  z-index: 3;
+}
+.prompt-guide {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* مستوى العين: شريط صافي في التلت اللي فوق، واللي فوقه وتحته باهت */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg) 78%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 20%,
+    transparent 27%,
+    transparent 50%,
+    color-mix(in srgb, var(--bg) 35%, transparent) 64%,
+    color-mix(in srgb, var(--bg) 70%, transparent) 100%
+  );
+}
+.prompt-guide::before {
+  /* علامة صغيرة على الجنب بتحدد مستوى العين من غير ما تقطع الكلام */
+  content: '';
+  position: absolute;
+  inset-inline-start: 3px;
+  top: 27%;
+  height: 23%;
+  width: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-faith) 60%, transparent);
+}
+.reader.prompting .reader-body {
+  padding-bottom: 75vh;
+}
+.prompt-bar {
+  z-index: 4;
+}
+.prompt-ctl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+.prompt-ctl .icon-btn:disabled {
+  opacity: 0.35;
+}
+.prompt-speed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 46px;
+  line-height: 1.1;
+}
+.follow-bar .prompt-speed small {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+.prompt-speed strong {
+  font-size: 17px;
+}
+.prompt-play {
+  border-radius: 999px;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}

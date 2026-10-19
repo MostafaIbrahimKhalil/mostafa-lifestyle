@@ -9,6 +9,8 @@ import { errorText, listen, makeFollower, normalize, speechSupported } from '../
 const SURAH = Object.fromEntries(QURAN.surahs.map((s) => [s.n, s]))
 const BASMALA = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ'
 const FONT_SIZES = [22, 25, 28, 32, 36]
+// سرعات التمرير التلقائي (بكسل في الثانية عند خط ٢٨) — الخط الأكبر بيمشي أسرع بنفس النسبة
+const PROMPT_SPEEDS = [8, 12, 16, 21, 27, 34, 42, 52, 64]
 
 // قيمة رقمية في علامات اليوم (بنقرا ونكتب في نفس العملية)
 async function bumpCheck(date, item, fn) {
@@ -192,6 +194,71 @@ export default function QuranReader({ juz, today, settings, onClose }) {
   }
   const page = rows?.[idx]?.p
 
+  // ===== التمرير التلقائي زي التيليبرومبتر: الكلام بيطلع لمستوى عينك لوحده =====
+  const [prompt, setPrompt] = useState(null) // null | 'on' | 'paused'
+  const speedIdx = Math.min(PROMPT_SPEEDS.length - 1, Math.max(0, settings.promptSpeed ?? 3))
+  const speedRef = useRef(0)
+  speedRef.current = PROMPT_SPEEDS[speedIdx] * (FONT_SIZES[fontIdx] / 28)
+  const holdRef = useRef(false)
+
+  useEffect(() => {
+    if (prompt !== 'on') return
+    const el = scroller.current
+    if (!el) return
+    let acc = el.scrollTop
+    let last = performance.now()
+    let raf
+    const step = (t) => {
+      const dt = Math.min(0.1, (t - last) / 1000)
+      last = t
+      // وإنت ماسك الشاشة بصباعك: التمرير بيستناك، وبيكمل من المكان اللي سبته فيه
+      if (holdRef.current) acc = el.scrollTop
+      else {
+        acc += speedRef.current * dt
+        el.scrollTop = acc
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) {
+          setPrompt('paused')
+          return
+        }
+      }
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    const hold = () => {
+      holdRef.current = true
+    }
+    const release = () => {
+      setTimeout(() => {
+        holdRef.current = false
+      }, 350)
+    }
+    el.addEventListener('touchstart', hold, { passive: true })
+    el.addEventListener('touchend', release, { passive: true })
+    el.addEventListener('touchcancel', release, { passive: true })
+    // الشاشة ما تطفيش وإنت بتقرا
+    let lock = null
+    let gone = false
+    navigator.wakeLock
+      ?.request('screen')
+      .then((l) => (gone ? l.release() : (lock = l)))
+      .catch(() => {})
+    return () => {
+      gone = true
+      cancelAnimationFrame(raf)
+      el.removeEventListener('touchstart', hold)
+      el.removeEventListener('touchend', release)
+      el.removeEventListener('touchcancel', release)
+      lock?.release().catch(() => {})
+      holdRef.current = false
+    }
+  }, [prompt])
+
+  function startPrompt() {
+    if (follow) exitFollow()
+    setPrompt('on')
+  }
+  const setSpeed = (i) => setSetting('promptSpeed', Math.min(PROMPT_SPEEDS.length - 1, Math.max(0, i)))
+
   async function finish() {
     await setCheck(today, 'wird', true, juz)
     await bumpCheck(today, 'wird:pct', () => 100)
@@ -203,7 +270,7 @@ export default function QuranReader({ juz, today, settings, onClose }) {
   }
 
   return (
-    <div className="reader" role="dialog" aria-label={`الجزء ${juz}`}>
+    <div className={`reader ${prompt ? 'prompting' : ''}`} role="dialog" aria-label={`الجزء ${juz}`}>
       <header className="reader-bar">
         <button className="icon-btn" onClick={() => onClose(false)} aria-label="رجوع">
           <Icon name="chevronRight" />
@@ -247,7 +314,16 @@ export default function QuranReader({ juz, today, settings, onClose }) {
         <span style={{ width: `${pct}%` }} />
       </span>
 
-      <div className="reader-body" ref={scroller} style={{ '--qfs': `${FONT_SIZES[fontIdx]}px` }}>
+      {prompt && <div className="prompt-guide" aria-hidden="true" />}
+      <div
+        className="reader-body"
+        ref={scroller}
+        style={{ '--qfs': `${FONT_SIZES[fontIdx]}px` }}
+        onClick={(e) => {
+          // لمسة على الكلام: وقّف / كمّل
+          if (prompt && !e.target.closest('button')) setPrompt(prompt === 'on' ? 'paused' : 'on')
+        }}
+      >
         {error && <p className="muted center">{error}. اتأكد إن النت شغال أول مرة بس.</p>}
         {!rows && !error && <p className="muted center">بيفتح الجزء…</p>}
         {rows && <JuzText rows={rows} words={words.perRow} />}
@@ -262,7 +338,7 @@ export default function QuranReader({ juz, today, settings, onClose }) {
         )}
       </div>
 
-      {rows && speechSupported() && voiceOn && (
+      {rows && speechSupported() && voiceOn && follow && (
         <div className={`follow-bar ${follow === 'on' ? 'is-on' : ''}`}>
           {followErr && <small className="late">{followErr}</small>}
           {follow === 'on' && <small>بسمعك… الكلمة اللي بتقراها بتنوّر</small>}
@@ -282,6 +358,50 @@ export default function QuranReader({ juz, today, settings, onClose }) {
               </button>
             )}
           </div>
+        </div>
+      )}
+      {rows && !follow && (
+        <div className="follow-bar prompt-bar">
+          {prompt ? (
+            <div className="prompt-ctl" role="group" aria-label="التمرير التلقائي">
+              <button className="icon-btn" onClick={() => setPrompt(null)} aria-label="اقفل التمرير">
+                <Icon name="close" size={18} />
+              </button>
+              <button className="icon-btn" onClick={() => setSpeed(speedIdx - 1)} disabled={speedIdx === 0} aria-label="أبطأ">
+                <Icon name="minus" size={18} />
+              </button>
+              <span className="prompt-speed">
+                <small>السرعة</small>
+                <strong>{num(speedIdx + 1)}</strong>
+              </span>
+              <button
+                className="icon-btn"
+                onClick={() => setSpeed(speedIdx + 1)}
+                disabled={speedIdx === PROMPT_SPEEDS.length - 1}
+                aria-label="أسرع"
+              >
+                <Icon name="plus" size={18} />
+              </button>
+              <button
+                className="btn prompt-play"
+                onClick={() => setPrompt(prompt === 'on' ? 'paused' : 'on')}
+                aria-label={prompt === 'on' ? 'وقّف' : 'كمّل'}
+              >
+                <Icon name={prompt === 'on' ? 'pause' : 'play'} size={20} />
+              </button>
+            </div>
+          ) : (
+            <div className="row">
+              <button className="btn follow-btn" onClick={startPrompt}>
+                <Icon name="play" size={18} /> ابدأ
+              </button>
+              {speechSupported() && voiceOn && (
+                <button className="btn btn-ghost follow-btn" onClick={startFollow}>
+                  <Icon name="mic" size={18} /> اقرا بصوتك
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
