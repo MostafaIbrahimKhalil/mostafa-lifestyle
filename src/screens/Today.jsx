@@ -5,7 +5,7 @@ import Icon from '../components/Icon.jsx'
 import TasbihSheet from '../components/TasbihSheet.jsx'
 import { db, setCheck, setSetting } from '../db.js'
 import { useNow } from '../hooks.js'
-import { buildDay, currentPrayer } from '../lib/day.js'
+import { ITEM_ASPECT, buildDay, currentPrayer } from '../lib/day.js'
 import { groupTasks } from '../lib/tasks.js'
 import { remindersFor } from '../lib/reminders.js'
 import { CheckButton, TaskItem } from '../components/TaskParts.jsx'
@@ -26,7 +26,7 @@ import {
 } from '../lib/dates.js'
 import { isIOS, isStandalone } from '../lib/device.js'
 import { getDeviceLocation } from '../lib/prayer.js'
-import { MEALS, WATER_TARGET } from '../lib/day.js'
+import { WATER_TARGET } from '../lib/day.js'
 import QuranReader from './QuranReader.jsx'
 import AdhkarReader from './AdhkarReader.jsx'
 import Workout from './Workout.jsx'
@@ -34,7 +34,7 @@ import { lessonTitle, todayPlan } from '../lib/hifz.js'
 import { backupDue, shareBackup } from '../lib/backup.js'
 import { postStage } from '../lib/plan.js'
 import { zeinIdea } from '../data/zein.js'
-import { isSunnahFastDay, mealNames, tomorrowKey, waterPlan, waterStatus } from '../lib/water.js'
+import { isSunnahFastDay, tomorrowKey } from '../lib/water.js'
 
 // من الخطة: فيديو نازل النهارده أو بكرة، ومواعيد الدكاترة والتطعيمات
 function PlanToday({ today, isToday, onOpenSub }) {
@@ -113,7 +113,7 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
   }, [hifzRows, settings.hifzPace, today])
   const allTasks = useLiveQuery(() => db.tasks.toArray(), [])
 
-  const { rows, times } = buildDay(day, settings)
+  const { rows, times } = buildDay(day, settings, { fasting: (checks || []).some((c) => c.item === 'fast:yes') })
   const checked = useMemo(() => new Map((checks || []).map((c) => [c.item, c])), [checks])
   const checkedSet = useMemo(() => new Set(checked.keys()), [checked])
   const g = useMemo(() => {
@@ -135,6 +135,16 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
   const next = isToday && rows.find((r) => !r.hideTime && r.time > now && !checkedSet.has(r.id))
 
   const toggle = (item, done, value) => setCheck(today, item, done, value)
+
+  // كل كمية مية لوحدها، والمجموع بيتحسب منهم
+  async function toggleWater(r, d) {
+    await setCheck(today, r.id, d)
+    const total = rows
+      .filter((x) => x.type === 'water')
+      .reduce((sum, x) => sum + ((x.id === r.id ? d : checkedSet.has(x.id)) ? x.cups : 0), 0)
+    await setCheck(today, 'water:count', total > 0, total)
+    await setCheck(today, 'water', total >= WATER_TARGET, total)
+  }
 
   async function toggleWird(juz, done) {
     await setCheck(today, 'wird', done, juz)
@@ -280,10 +290,20 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
               <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
             )
           }
-          if (r.type === 'food')
+          if (r.type === 'water') {
+            const first = r.id === 'water:p0'
+            const askFast = first && isToday && !fasting && !checkedSet.has('fast:no') && !isSunnahFastDay(day) && now < times.maghrib
             return (
-              <FoodBlock key={r.id} checkedSet={checkedSet} checked={checked} today={today} day={day} now={now} settings={settings} fasting={fasting} />
+              <CheckRow
+                key={r.id}
+                row={r}
+                done={checkedSet.has(r.id)}
+                onToggle={(d) => toggleWater(r, d)}
+                onOpen={askFast ? () => window.confirm('صايم النهارده؟ المية هتتقسم من المغرب للفجر') && setFast(today, true) : undefined}
+                openLabel="صايم؟"
+              />
             )
+          }
           if (r.type === 'gym') {
             const done = checkedSet.has('gym')
             const label = r.routine.exercises.length ? `${num(r.routine.exercises.length)} تمارين + كارديو ${num(r.routine.cardio)} دقيقة` : `مشي ${num(r.routine.walk)} دقيقة`
@@ -432,7 +452,7 @@ function PrayerRow({ row, now, isCurrent, done, state, onState, tasbihDone, onTo
 }
 
 function CheckRow({ row, done, onToggle, onOpen, openLabel }) {
-  const aspect = row.id.startsWith('teeth') || row.id === 'gym' ? 'health' : 'faith'
+  const aspect = row.type === 'water' ? 'work' : ITEM_ASPECT(row.id)
   return (
     <li className={`tl-item ${done ? 'is-done' : ''}`}>
       <span className="tl-time">{row.hideTime ? '' : formatTime(row.time)}</span>
@@ -660,14 +680,14 @@ function FastCard({ day, now, isToday, isFuture, times, today, checkedSet, tomor
             </button>
           )}
         </div>
-        <p className="muted">المية والوجبات اتظبطت على الصيام: من المغرب للفجر.</p>
+        <p className="muted">المية اتظبطت على الصيام: من المغرب للفجر.</p>
       </section>
     )
   if (askToday)
     return (
       <section className="card fast-card">
         <strong>النهارده {dayName(day)}: صايم؟</strong>
-        <small className="muted">لو صايم، المية والوجبات هيتقسموا من المغرب للفجر.</small>
+        <small className="muted">لو صايم، المية هتتقسم من المغرب للفجر.</small>
         <div className="row">
           <button className="btn" onClick={() => setFast(today, true)}>
             أيوه صايم
@@ -708,92 +728,6 @@ function FastCard({ day, now, isToday, isFuture, times, today, checkedSet, tomor
       </section>
     )
   return null
-}
-
-function FoodBlock({ checkedSet, checked, today, day, now, settings, fasting }) {
-  const water = checked.get('water:count')?.value || 0
-  const names = mealNames(fasting)
-  const plan = useMemo(() => waterPlan(day, settings, fasting), [day, settings, fasting])
-  const ws = waterStatus(plan, water, now)
-
-  async function addWater(delta) {
-    const next = Math.max(0, Math.min(20, water + delta))
-    await setCheck(today, 'water:count', next > 0, next)
-    await setCheck(today, 'water', next >= WATER_TARGET, next)
-  }
-
-  return (
-    <li className="tl-item tl-work">
-      <span className="tl-time" />
-      <div className="tl-body">
-        <div className="tl-main">
-          <span className="tl-icon tl-icon-health">
-            <Icon name="plate" size={18} />
-          </span>
-          <div className="tl-text">
-            <strong>الأكل والمية</strong>
-            <small>{fasting ? 'يوم صيام: سحور متأخر، وفطار خفيف على مرحلتين' : 'نص الطبق خضار، ربعه بروتين، ربعه نشويات'}</small>
-            <small>البروتين: حوالي ١٠٠–١٣٠ جرام في اليوم — فراخ، لحمة، سمك، بيض، زبادي، جبنة قريش، فول، عدس</small>
-          </div>
-        </div>
-        <ul className="tasks">
-          {MEALS.map((m) => (
-            <li key={m.id} className={`task ${checkedSet.has(m.id) ? 'is-done' : ''}`}>
-              <span className="task-title">
-                {names[m.id]}
-                <small className="muted">على الطبق المظبوط</small>
-                <button
-                  className={`chip protein-chip ${checkedSet.has(`protein:${m.id}`) ? 'chip-on' : ''}`}
-                  onClick={() => setCheck(today, `protein:${m.id}`, !checkedSet.has(`protein:${m.id}`))}
-                  aria-pressed={checkedSet.has(`protein:${m.id}`)}
-                >
-                  {checkedSet.has(`protein:${m.id}`) ? '✓ ' : ''}فيها بروتين
-                </button>
-              </span>
-              <CheckButton done={checkedSet.has(m.id)} onToggle={(d) => setCheck(today, m.id, d)} label={names[m.id]} />
-            </li>
-          ))}
-          <li className={`task ${checkedSet.has('clean') ? 'is-done' : ''}`}>
-            <span className="task-title">
-              من غير حاجات تزوّد
-              <small className="muted">ساقع، عصير، حلويات، مقليات، أكل بالليل</small>
-            </span>
-            <CheckButton done={checkedSet.has('clean')} onToggle={(d) => setCheck(today, 'clean', d)} label="من غير حاجات تزوّد" />
-          </li>
-        </ul>
-        <div className="water water-compact">
-          <button className="icon-btn water-minus" onClick={() => addWater(-1)} disabled={!water} aria-label="شيل كوباية">
-            −
-          </button>
-          <div className="water-mid">
-            <span>
-              المية <strong>{num(water)}</strong>/{num(WATER_TARGET)}
-            </span>
-            <small className={ws.behind > 0 ? 'late' : 'muted'}>
-              {water >= WATER_TARGET
-                ? 'خلّصت مية النهارده ✓'
-                : ws.behind > 0
-                  ? `متأخر ${num(ws.behind)} ${ws.behind === 1 ? 'كوباية' : 'كوبايات'}`
-                  : ws.next
-                    ? `الجاية ${formatTime(ws.next.at)}`
-                    : ''}
-            </small>
-            <span className="bar bar-thin water-bar">
-              <span style={{ width: `${Math.min(1, water / WATER_TARGET) * 100}%` }} />
-            </span>
-          </div>
-          <button className="btn water-plus" onClick={() => addWater(1)}>
-            + كوباية
-          </button>
-        </div>
-        {!fasting && !checkedSet.has('fast:no') && !isSunnahFastDay(day) && (
-          <button className="link-btn" onClick={() => setFast(today, true)}>
-            صايم النهارده؟
-          </button>
-        )}
-      </div>
-    </li>
-  )
 }
 
 function TasksBlock({ g, checkedSet, today, total, done, onOpen }) {

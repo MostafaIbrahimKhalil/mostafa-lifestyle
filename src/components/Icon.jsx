@@ -68,6 +68,7 @@ const PATHS = {
     </>
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  drop: <path d="M12 3.5c3 3.6 6 7.3 6 10.6A6 6 0 0 1 6 14.1c0-3.3 3-7 6-10.6Z" />,
   play: <path d="M8 5.5v13l10.5-6.5Z" />,
   pause: <path d="M9 5.5v13M15 5.5v13" />,
   minus: <path d="M5 12h14" />,

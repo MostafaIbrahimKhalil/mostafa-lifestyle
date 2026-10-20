@@ -196,9 +196,13 @@ export default function QuranReader({ juz, today, settings, onClose }) {
 
   // ===== التمرير التلقائي زي التيليبرومبتر: الكلام بيطلع لمستوى عينك لوحده =====
   const [prompt, setPrompt] = useState(null) // null | 'on' | 'paused'
-  const speedIdx = Math.min(PROMPT_SPEEDS.length - 1, Math.max(0, settings.promptSpeed ?? 3))
+  // السرعة من ١ لـ ٩ بنص درجة (٣٫٥ = بين ٣ و٤)
+  const level = Math.min(9, Math.max(1, settings.promptLevel ?? 3.5))
+  const lo = Math.floor(level) - 1
+  const hi = Math.min(PROMPT_SPEEDS.length - 1, lo + 1)
+  const pxs = PROMPT_SPEEDS[lo] + (PROMPT_SPEEDS[hi] - PROMPT_SPEEDS[lo]) * (level - Math.floor(level))
   const speedRef = useRef(0)
-  speedRef.current = PROMPT_SPEEDS[speedIdx] * (FONT_SIZES[fontIdx] / 28)
+  speedRef.current = pxs * (FONT_SIZES[fontIdx] / 28)
   const holdRef = useRef(false)
 
   useEffect(() => {
@@ -257,7 +261,7 @@ export default function QuranReader({ juz, today, settings, onClose }) {
     if (follow) exitFollow()
     setPrompt('on')
   }
-  const setSpeed = (i) => setSetting('promptSpeed', Math.min(PROMPT_SPEEDS.length - 1, Math.max(0, i)))
+  const setSpeed = (v) => setSetting('promptLevel', Math.min(9, Math.max(1, v)))
 
   async function finish() {
     await setCheck(today, 'wird', true, juz)
@@ -367,17 +371,17 @@ export default function QuranReader({ juz, today, settings, onClose }) {
               <button className="icon-btn" onClick={() => setPrompt(null)} aria-label="اقفل التمرير">
                 <Icon name="close" size={18} />
               </button>
-              <button className="icon-btn" onClick={() => setSpeed(speedIdx - 1)} disabled={speedIdx === 0} aria-label="أبطأ">
+              <button className="icon-btn" onClick={() => setSpeed(level - 0.5)} disabled={level <= 1} aria-label="أبطأ">
                 <Icon name="minus" size={18} />
               </button>
               <span className="prompt-speed">
                 <small>السرعة</small>
-                <strong>{num(speedIdx + 1)}</strong>
+                <strong>{num(level)}</strong>
               </span>
               <button
                 className="icon-btn"
-                onClick={() => setSpeed(speedIdx + 1)}
-                disabled={speedIdx === PROMPT_SPEEDS.length - 1}
+                onClick={() => setSpeed(level + 0.5)}
+                disabled={level >= 9}
                 aria-label="أسرع"
               >
                 <Icon name="plus" size={18} />

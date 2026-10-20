@@ -102,7 +102,7 @@ export async function buildReport(kind, settings, now = new Date()) {
 
   // ===== الصحة =====
   L.push('', '【الصحة】')
-  for (const [id, label] of [['gym', 'الجيم'], ['teeth:am'], ['teeth:pm'], ['nails', 'قص الضوافر'], ['plate', 'الأكل على الطبق المظبوط'], ['protein'], ['clean', 'من غير حاجات تزوّد'], ['water', `المية كاملة (${n(WATER_TARGET)} كوباية)`]]) {
+  for (const [id, label] of [['gym', 'الجيم'], ['teeth:am'], ['teeth:pm'], ['nails', 'قص الضوافر'], ['water', `المية كاملة (${n(WATER_TARGET)} كوباية)`]]) {
     const l = line(id, label)
     if (l) L.push(`- ${l}`)
   }

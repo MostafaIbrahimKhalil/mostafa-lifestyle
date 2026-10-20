@@ -1,5 +1,6 @@
 import { PRAYERS, prayerTimesFor } from './prayer.js'
-import { timeOnDay } from './dates.js'
+import { num, timeOnDay } from './dates.js'
+import { waterPlan } from './water.js'
 import { gymTimeFor, isGymDay, routineFor } from './workout.js'
 
 const MIN = 60 * 1000
@@ -18,23 +19,24 @@ export function trackedItemIds(settings, day = null) {
   for (const p of PRAYERS) ids.push(`prayer:${p.id}`, `tasbih:${p.id}`)
   ids.push('adhkar:morning', 'adhkar:evening', 'adhkar:sleep', 'teeth:am', 'teeth:pm', 'wird')
   if (settings.hifzEnabled !== false) ids.push('hifz')
-  if (settings.foodEnabled !== false) ids.push(...MEALS.map((m) => m.id), 'water', 'clean')
+  if (settings.waterEnabled !== false) ids.push('water')
   if (day && isGymDay(day, settings)) ids.push('gym')
   if (day && day.getDay() === 4 && day >= new Date(2026, 9, 22)) ids.push('nails')
   if (settings.zeinEnabled !== false && (!day || day >= new Date(2026, 9, 19))) ids.push('zein')
+  if (!day || day >= new Date(2026, 9, 20)) ids.push('mom')
   return ids
 }
 
 export const ITEM_ASPECT = (item) => {
-  if (item.startsWith('teeth') || item.startsWith('meal') || item === 'water' || item === 'clean' || item === 'gym' || item === 'nails')
+  if (item.startsWith('teeth') || item.startsWith('meal') || item.startsWith('water') || item === 'clean' || item === 'gym' || item === 'nails')
     return 'health'
   if (item.startsWith('task')) return 'work'
-  if (item === 'zein') return 'family'
+  if (item === 'zein' || item === 'mom') return 'family'
   return 'faith'
 }
 
 // يبني قائمة اليوم مرتّبة بالوقت من الفجر للنوم
-export function buildDay(day, settings) {
+export function buildDay(day, settings, { fasting = false } = {}) {
   const times = prayerTimesFor(day, settings.location || undefined)
   const sleep = timeOnDay(day, settings.sleepTime || DEFAULT_SLEEP)
   const slot = settings.wirdSlot || 'fajr'
@@ -85,9 +87,11 @@ export function buildDay(day, settings) {
     hideTime: true,
   })
 
-  // الأكل والمية بعد الظهر
-  if (settings.foodEnabled !== false) {
-    rows.push({ type: 'food', id: 'food', title: 'الأكل والمية', time: new Date(times.dhuhr.getTime() + 30 * MIN), hideTime: true })
+  // المية: كل كمية في وقتها وتتعلّم لوحدها
+  if (settings.waterEnabled !== false) {
+    waterPlan(day, settings, fasting).forEach((p, j) => {
+      rows.push({ type: 'water', id: `water:p${j}`, title: `مية: ${num(p.cups)} ${p.cups === 1 ? 'كوباية' : 'كوبايات'}`, subtitle: p.label, cups: p.cups, time: p.at, icon: 'drop' })
+    })
   }
 
   // الجيم في أيامه
@@ -123,6 +127,10 @@ export function buildDay(day, settings) {
   // وقت زين: بعد المغرب بربع ساعة، وفكرة نشاط مختلفة كل يوم
   if (settings.zeinEnabled !== false) {
     rows.push({ type: 'zein', id: 'zein', title: 'وقت زين', icon: 'heart', time: new Date(times.maghrib.getTime() + 15 * MIN) })
+  }
+  // مكالمة ماما كل يوم
+  if (day >= new Date(2026, 9, 20)) {
+    rows.push({ type: 'check', id: 'mom', title: 'كلّم ماما', subtitle: 'مكالمة كل يوم 🤍', icon: 'heart', time: new Date(times.asr.getTime() + 45 * MIN) })
   }
   // قص الضوافر كل خميس بالليل
   if (day.getDay() === 4) {

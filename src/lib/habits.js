@@ -1,6 +1,5 @@
 import { PRAYERS } from './prayer.js'
 import { gymWeekdays } from './workout.js'
-import { MEALS } from './day.js'
 import { FAST_DAYS, FAST_START } from './water.js'
 import { addDays, dateKey, fromKey, todayKey } from './dates.js'
 
@@ -29,17 +28,11 @@ export function habitDefs(settings, tasks) {
     { id: 'teeth:pm', name: 'أسنان قبل النوم', aspect: 'health', group: 'الصحة' },
     // الجيم بيتحسب في أيامه بس، وباقي الأيام مش بتكسر السلسلة
     { id: 'zein', name: 'وقت زين', aspect: 'family', group: 'الأسرة', start: '2026-10-19' },
+    { id: 'mom', name: 'مكالمة ماما', aspect: 'family', group: 'الأسرة', start: '2026-10-20' },
     { id: 'nails', name: 'قص الضوافر (كل خميس)', aspect: 'health', group: 'الصحة', days: [4], start: '2026-10-22' },
     { id: 'gym', name: 'الجيم', aspect: 'health', group: 'الصحة', days: gymWeekdays(settings) },
   )
-  if (settings.foodEnabled !== false) {
-    defs.push(
-      { id: 'plate', name: 'الأكل على الطبق المظبوط', aspect: 'health', group: 'الأكل', needs: MEALS.map((m) => m.id) },
-      { id: 'water', name: '٣ لتر مية', aspect: 'health', group: 'الأكل' },
-      { id: 'protein', name: 'بروتين في كل وجبة', aspect: 'health', group: 'الأكل', start: '2026-10-19', needs: MEALS.map((m) => `protein:${m.id}`) },
-      { id: 'clean', name: 'من غير حاجات تزوّد', aspect: 'health', group: 'الأكل' },
-    )
-  }
+  if (settings.waterEnabled !== false) defs.push({ id: 'water', name: '٣ لتر مية', aspect: 'health', group: 'الصحة' })
   const todayK = todayKey()
   for (const t of tasks.filter((t) => t.kind === 'daily' && t.active !== false && (!t.startDate || t.startDate <= todayK))) {
     defs.push({

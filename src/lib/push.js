@@ -94,6 +94,7 @@ export async function buildSchedule(settings, now = new Date()) {
       const idea = zeinIdea(dateKey(day), settings.zeinPick?.date === dateKey(day) ? settings.zeinPick.shift : 0)
       push(new Date(t.maghrib.getTime() + 15 * MIN), 'وقت زين 🤍', `النهارده: ${idea.title}`, 'zein', 'zein', i)
     }
+    if (prefs.zein) push(new Date(t.asr.getTime() + 45 * MIN), 'كلّم ماما 🤍', 'مكالمة النهارده', 'mom', 'mom', i)
     const routine = routineFor(day, settings)
     if (prefs.gym && routine && !routine.optional) {
       const at = gymTimeFor(day, settings, t)
@@ -186,19 +187,19 @@ export async function buildSchedule(settings, now = new Date()) {
     }
   }
   // المية والصيام
-  if ((prefs.water || prefs.fast) && settings.foodEnabled !== false) {
+  if (prefs.water || prefs.fast) {
     const k0 = dateKey(today)
     const k1 = dateKey(addDays(today, 1))
     const items = await db.checks.where('date').anyOf(k0, k1).toArray()
     const has = (k, item) => items.some((c) => c.date === k && c.item === item)
-    const count = items.find((c) => c.date === k0 && c.item === 'water:count')?.value || 0
     for (let i = 0; i < SCHEDULE_DAYS; i++) {
       const day = addDays(today, i)
-      const k = i ? k1 : k0
+      const k = dateKey(day)
       const fasting = has(k, 'fast:yes')
       if (prefs.water) {
         waterPlan(day, settings, fasting).forEach((p, j) => {
-          if (i === 0 && count >= p.sum) return
+          if (settings.waterEnabled === false) return
+          if (i === 0 && has(k0, `water:p${j}`)) return
           push(p.at, `اشرب ${p.cups.toLocaleString('ar-EG')} ${p.cups === 1 ? 'كوباية' : 'كوبايات'} مية`, p.label, `water-${k}-${j}`, null, i)
         })
       }
