@@ -86,7 +86,7 @@ export async function buildReport(kind, settings, now = new Date()) {
     const l = line(k, `صلاة ${p.name}`)
     if (l) L.push(`- ${l}${extra ? ` — ${extra}` : ''}`)
   }
-  for (const [id, label] of [['tasbih', 'التسبيح بعد الصلوات'], ['adhkar:morning'], ['adhkar:evening'], ['adhkar:sleep'], ['wird'], ['fast', 'صيام الاتنين والخميس']]) {
+  for (const [id, label] of [['tasbih:daily', 'التسبيح اليومي'], ['adhkar:morning'], ['adhkar:evening'], ['adhkar:sleep'], ['wird'], ['fast', 'صيام الاتنين والخميس']]) {
     const l = line(id, label)
     if (l) L.push(`- ${l}`)
   }

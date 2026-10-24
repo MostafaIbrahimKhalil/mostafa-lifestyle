@@ -3,7 +3,7 @@ import { addDays, dateKey, fromKey, todayKey } from './dates.js'
 
 export const CATEGORIES = [
   { id: 'prayer', name: 'الصلاة' },
-  { id: 'tasbih', name: 'التسبيح بعد الصلاة' },
+  { id: 'tasbih', name: 'التسبيح' },
   { id: 'adhkar', name: 'الأذكار' },
   { id: 'wird', name: 'الورد' },
   { id: 'hifz', name: 'الحفظ' },

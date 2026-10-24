@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import Icon from '../components/Icon.jsx'
-import { db, setSetting } from '../db.js'
+import { db, setCheck, setSetting } from '../db.js'
 import { num, todayKey } from '../lib/dates.js'
 
 const BASE_PHRASES = [
@@ -68,6 +68,11 @@ export default function Tasbih({ settings }) {
 
   const progress = target > 0 ? ((count % target) || (count ? target : 0)) / target : 0
   const totalToday = rows.reduce((s, r) => s + r.count, 0)
+  const goal = settings.tasbihDailyGoal ?? 100
+  // لما توصل لهدف اليوم، "التسبيح اليومي" بيتعلّم لوحده في صفحة اليوم
+  useEffect(() => {
+    if (totalToday >= goal && totalToday > 0) setCheck(today, 'tasbih:daily', true)
+  }, [totalToday, goal, today])
 
   return (
     <>
@@ -75,6 +80,26 @@ export default function Tasbih({ settings }) {
         <h1>التسبيح</h1>
         <p className="muted">النهارده: {num(totalToday)} تسبيحة</p>
       </header>
+
+      <section className="card tasbih-goal">
+        <div className="row-between">
+          <strong>هدف النهارده</strong>
+          <span className={totalToday >= goal ? 'pos' : 'muted'}>
+            {totalToday >= goal ? `خلّصت ✓ ${num(totalToday)}` : `${num(totalToday)} من ${num(goal)}`}
+          </span>
+        </div>
+        <span className="bar">
+          <span style={{ width: `${Math.min(1, totalToday / goal) * 100}%` }} />
+        </span>
+        <div className="seg seg-small" role="radiogroup" aria-label="هدف اليوم">
+          {[100, 300, 500, 1000].map((g) => (
+            <button key={g} className={goal === g ? 'is-on' : ''} onClick={() => setSetting('tasbihDailyGoal', g)}>
+              {num(g)}
+            </button>
+          ))}
+        </div>
+        <p className="muted small">أي ذكر بتسبّحه بيتحسب في الهدف: سبحان الله وبحمده، الاستغفار، الصلاة على النبي…</p>
+      </section>
 
       <div className="phrase-scroll" role="radiogroup" aria-label="الذكر">
         {phrases.map((p) => (

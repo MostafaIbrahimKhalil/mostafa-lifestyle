@@ -262,6 +262,7 @@ export async function enablePush(settings) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subscription: sub.toJSON() }),
   }).then((x) => x.json())
+  if (r.id) await setSetting('pushId', r.id)
   if (!r.ok) throw new Error(`السيرفر ما قدرش يبعت (${r.status || r.error})`)
   return true
 }
@@ -287,6 +288,7 @@ export async function sync(settings, existing = null) {
     await setSetting('pushLastError', null)
     await setSetting('pushNext', schedule[0] ? { at: schedule[0].at, title: schedule[0].title } : null)
     await setSetting('pushScheduled', res?.scheduled ?? schedule.length)
+    if (res?.id) await setSetting('pushId', res.id)
     return res
   } catch (err) {
     await setSetting('pushLastError', `ما قدرش يوصل للسيرفر (${err?.message || err})`)
@@ -301,6 +303,12 @@ export async function repairPush(settings) {
   const old = await reg.pushManager.getSubscription()
   if (old) await old.unsubscribe().catch(() => {})
   return enablePush(settings)
+}
+
+// حالة الاشتراك عند السيرفر: عنده اشتراكك؟ وآخر إشعار اتبعت وصل ولا اترفض؟
+export async function serverStatus(id) {
+  if (!id) return null
+  return fetch(`${PUSH_URL}/status?id=${encodeURIComponent(id)}`).then((r) => r.json())
 }
 
 export async function pushEnabled() {

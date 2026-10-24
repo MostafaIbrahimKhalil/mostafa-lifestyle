@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import QuickAddSheet from '../components/QuickAddSheet.jsx'
 import Icon from '../components/Icon.jsx'
-import TasbihSheet from '../components/TasbihSheet.jsx'
 import { db, setCheck, setSetting } from '../db.js'
 import { useNow } from '../hooks.js'
 import { ITEM_ASPECT, buildDay, currentPrayer } from '../lib/day.js'
@@ -96,7 +95,6 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
   // يوم فات: اليوم كله خلص. يوم جاي: لسه ما بدأش
   const now = isToday ? realNow : isFuture ? day : addDays(day, 1)
   const dayLabel = offset === 0 ? 'النهارده' : offset === -1 ? 'امبارح' : offset === 1 ? 'بكرة' : formatShortDate(day)
-  const [tasbihFor, setTasbihFor] = useState(null)
   const [locMsg, setLocMsg] = useState(null)
   const [overlay, setOverlay] = useState(null) // { kind: 'quran'|'adhkar'|'gym', ... }
 
@@ -112,6 +110,7 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
     return { title: 'الحفظ', subtitle: `حفظت ${lessonTitle(p.lesson)}${due || '، سمّعه بعد ساعة وقبل النوم'}` }
   }, [hifzRows, settings.hifzPace, today])
   const allTasks = useLiveQuery(() => db.tasks.toArray(), [])
+  const tasbihToday = useLiveQuery(async () => (await db.tasbih.where('date').equals(today).toArray()).reduce((s, x) => s + x.count, 0), [today]) || 0
 
   const { rows, times } = buildDay(day, settings, { fasting: (checks || []).some((c) => c.item === 'fast:yes') })
   const checked = useMemo(() => new Map((checks || []).map((c) => [c.item, c])), [checks])
@@ -260,10 +259,7 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
                 done={checkedSet.has(r.id)}
                 state={checked.get(r.id)?.value}
                 onState={(v) => toggle(r.id, true, v)}
-                tasbihDone={checkedSet.has(`tasbih:${r.prayer}`)}
                 onToggle={(d) => toggle(r.id, d, 'ontime')}
-                onTasbih={() => setTasbihFor(r)}
-                onUndoTasbih={() => toggle(`tasbih:${r.prayer}`, false)}
               />
             )
           if (r.type === 'wird') {
@@ -288,6 +284,19 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
           if (r.type === 'work') {
             return (
               <TasksBlock key={r.id} g={g} checkedSet={checkedSet} today={today} total={workTotal} done={workDone} onOpen={onOpenTasks} />
+            )
+          }
+          if (r.type === 'tasbih') {
+            const goal = settings.tasbihDailyGoal ?? 100
+            return (
+              <CheckRow
+                key={r.id}
+                row={{ ...r, subtitle: tasbihToday >= goal ? `${num(tasbihToday)} تسبيحة ✓` : `${num(tasbihToday)} من ${num(goal)}` }}
+                done={checkedSet.has(r.id)}
+                onToggle={(d) => toggle(r.id, d)}
+                onOpen={() => onOpenSub('tasbih')}
+                openLabel="سبّح"
+              />
             )
           }
           if (r.type === 'water') {
@@ -383,16 +392,6 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
       )}
       {overlay?.kind === 'gym' && <Workout routine={overlay.routine} today={today} onClose={() => setOverlay(null)} />}
 
-      {tasbihFor && (
-        <TasbihSheet
-          title={`تسبيح بعد ${tasbihFor.title}`}
-          onClose={() => setTasbihFor(null)}
-          onDone={() => {
-            toggle(`tasbih:${tasbihFor.prayer}`, true)
-            setTasbihFor(null)
-          }}
-        />
-      )}
       {!isPast && !overlay && (
         <button className="fab" onClick={() => setQuickAdd(true)} aria-label="ضيف مهمة أو تذكير">
           <Icon name="plus" size={26} stroke={2.2} />
@@ -410,7 +409,7 @@ const PRAYER_STATES = [
   ['qada', 'قضاء'],
 ]
 
-function PrayerRow({ row, now, isCurrent, done, state, onState, tasbihDone, onToggle, onTasbih, onUndoTasbih }) {
+function PrayerRow({ row, now, isCurrent, done, state, onState, onToggle }) {
   const upcoming = row.time > now
   const st = state === true || !state ? 'ontime' : state
   return (
@@ -436,15 +435,6 @@ function PrayerRow({ row, now, isCurrent, done, state, onState, tasbihDone, onTo
               </button>
             ))}
           </div>
-        )}
-        {(done || !upcoming) && (
-          <button
-            className={`chip ${tasbihDone ? 'chip-done' : ''}`}
-            onClick={tasbihDone ? onUndoTasbih : onTasbih}
-          >
-            <Icon name={tasbihDone ? 'check' : 'beads'} size={15} />
-            {tasbihDone ? 'سبّحت بعدها' : 'التسبيح بعد الصلاة'}
-          </button>
         )}
       </div>
     </li>

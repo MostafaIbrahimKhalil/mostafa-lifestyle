@@ -126,9 +126,15 @@ export function trainingTotals(workouts, from, to) {
 export const DEFAULT_GYM_DAYS = { 6: 'cardio', 0: 'A', 1: 'cardio', 2: 'cardio', 3: 'cardio', 4: 'B', 5: 'cardio' }
 export const DEFAULT_GYM_TIME = '17:00'
 
-// ميعاد الجيم: بعد العشا بنص ساعة (الافتراضي)، أو ساعة ثابتة لو قفلت "بعد العشا"
+// ميعاد الجيم: أول حاجة في اليوم بعد الفجر (الافتراضي)، أو بعد العشا، أو ساعة ثابتة
+export const GYM_SLOTS = { fajr: 'بعد الفجر على طول', isha: 'بعد العشا', fixed: 'ساعة ثابتة' }
+export function gymSlot(settings) {
+  return settings.gymSlot || 'fajr'
+}
 export function gymTimeFor(day, settings, times) {
-  if (settings.gymAfterIsha !== false && times?.isha) return new Date(times.isha.getTime() + 30 * 60 * 1000)
+  const slot = gymSlot(settings)
+  if (slot === 'fajr' && times?.fajr) return new Date(times.fajr.getTime() + 25 * 60 * 1000)
+  if (slot === 'isha' && times?.isha) return new Date(times.isha.getTime() + 30 * 60 * 1000)
   const [h, m] = (settings.gymTime || DEFAULT_GYM_TIME).split(':').map(Number)
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m)
 }

@@ -1,6 +1,7 @@
 // سيرفر الإشعارات (Cloudflare Worker) — بيبعت إشعارات Web Push في مواعيدها.
 // التطبيق بيبعتله "جدول" فيه مواعيد ونصوص التذكيرات بس — مفيش أي بيانات تانية.
 // المحتاجه: KV namespace مربوط باسم PUSH، وCron كل دقيقة "* * * * *".
+// الكرون ما بيكتبش على الاشتراكات خالص (عشان ما يمسحش جدول جديد)، بيبعت اللي ميعاده في الدقيقة دي بس.
 // مفاتيح VAPID بتتعمل لوحدها أول مرة وتتحفظ في KV.
 
 const ALLOWED_ORIGINS = ['https://mostafaibrahimkhalil.github.io', 'http://localhost:5173', 'http://localhost:4173']
@@ -105,12 +106,20 @@ async function sendPush(subscription, message, vapid, ttl = 1800) {
   return res.status
 }
 
-// ===== التخزين: مفتاح واحد فيه كل الاشتراكات (عشان حدود KV المجانية) =====
+// ===== التخزين =====
+// subs: الاشتراكات وجداولها — بيكتبها التطبيق بس
+// log: آخر إشعار اتبعت لكل اشتراك ونتيجته — عشان نعرف المشكلة فين
 async function loadAll(env) {
   return (await env.PUSH.get('subs', 'json')) || {}
 }
 async function saveAll(env, all) {
   await env.PUSH.put('subs', JSON.stringify(all))
+}
+async function loadLog(env) {
+  return (await env.PUSH.get('log', 'json')) || {}
+}
+async function saveLog(env, log) {
+  await env.PUSH.put('log', JSON.stringify(log))
 }
 
 function cors(req) {
@@ -191,7 +200,26 @@ export default {
           { title: 'مصطفى لايف', body: 'الإشعارات من السيرفر شغالة تمام ✓', tag: 'test' },
           vapid,
         )
-        return json(req, { ok: status < 300, status })
+        const id = await idFor(body.subscription.endpoint)
+        const log = await loadLog(env)
+        log[id] = { at: Date.now(), status, title: 'تجربة' }
+        await saveLog(env, log)
+        return json(req, { ok: status < 300, status, id })
+      }
+      if (url.pathname === '/status' && req.method === 'GET') {
+        const id = url.searchParams.get('id') || ''
+        const [all, log] = await Promise.all([loadAll(env), loadLog(env)])
+        const e = all[id]
+        const now = Date.now()
+        const left = e ? e.schedule.filter((x) => x.at > now) : []
+        return json(req, {
+          found: !!e,
+          updatedAt: e?.updatedAt || null,
+          scheduled: left.length,
+          next: left[0] ? { at: left[0].at, title: left[0].title } : null,
+          last: log[id] || null,
+          serverTime: now,
+        })
       }
       if (url.pathname === '/' || url.pathname === '/health') return json(req, { ok: true, service: 'mostafa-push' })
       return json(req, { error: 'not found' }, 404)
@@ -200,36 +228,32 @@ export default {
     }
   },
 
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(runDue(env))
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runDue(env, event.scheduledTime || Date.now()))
   },
 }
 
-async function runDue(env) {
+// كل دقيقة: نبعت اللي ميعاده جوه الدقيقة اللي فاتت بس — من غير ما نكتب على الجداول
+async function runDue(env, tick) {
   const all = await loadAll(env)
-  const now = Date.now()
-  let changed = false
+  const from = tick - 60000
   let vapid = null
+  let log = null
   for (const [id, entry] of Object.entries(all)) {
-    const due = entry.schedule.filter((x) => x.at <= now)
+    const due = (entry.schedule || []).filter((x) => x.at > from && x.at <= tick)
     if (!due.length) continue
     vapid ||= await getVapid(env)
-    entry.schedule = entry.schedule.filter((x) => x.at > now)
-    changed = true
+    log ||= await loadLog(env)
     for (const item of due) {
-      if (now - item.at > LATE_LIMIT_MS) continue
       const status = await sendPush(
         entry.subscription,
         { title: item.title, body: item.body, tag: item.tag, url: item.url },
         vapid,
-        Math.max(60, Math.round((LATE_LIMIT_MS - (now - item.at)) / 1000)),
+        Math.max(60, Math.round((LATE_LIMIT_MS - (Date.now() - item.at)) / 1000)),
       )
-      // ١٠٤ أو ٤١٠ = الاشتراك اتلغى
-      if (status === 404 || status === 410) {
-        delete all[id]
-        break
-      }
+      log[id] = { at: Date.now(), status, title: item.title }
+      if (status === 404 || status === 410) break // الاشتراك اتلغى من الموبايل
     }
   }
-  if (changed) await saveAll(env, all)
+  if (log) await saveLog(env, log)
 }

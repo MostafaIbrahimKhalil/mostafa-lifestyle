@@ -119,7 +119,7 @@ export default function App() {
 
   function openFromAnywhere(id) {
     setTab('more')
-    openSub(id)
+    openSub(id, '__today')
   }
 
   return (
@@ -151,8 +151,11 @@ export default function App() {
           )}
           {tab === 'wallet' && <Wallet settings={settings} onOpenWork={() => (setTab('more'), setSub('work'))} />}
           {tab === 'more' && sub && (
-            <button className="back-btn" onClick={() => (subBack ? openSub(subBack) : setSub(null))}>
-              <Icon name="chevronRight" size={18} /> {subBack === 'plan' ? 'خطتي' : 'المزيد'}
+            <button
+              className="back-btn"
+              onClick={() => (subBack === '__today' ? switchTab('today') : subBack ? openSub(subBack) : setSub(null))}
+            >
+              <Icon name="chevronRight" size={18} /> {subBack === 'plan' ? 'خطتي' : subBack === '__today' ? 'اليوم' : 'المزيد'}
             </button>
           )}
           {tab === 'more' && !sub && <More onOpen={openSub} />}

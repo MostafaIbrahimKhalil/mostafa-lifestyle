@@ -14,7 +14,7 @@ export function habitDefs(settings, tasks) {
   const defs = [
     // الصلاة ما ليهاش يوم عذر
     ...PRAYERS.map((p) => ({ id: `prayer:${p.id}`, name: `صلاة ${p.name}`, aspect: 'faith', group: 'الصلاة', noSkip: true })),
-    { id: 'tasbih', name: 'التسبيح بعد الصلوات', aspect: 'faith', group: 'الأذكار', needs: PRAYERS.map((p) => `tasbih:${p.id}`) },
+    { id: 'tasbih:daily', name: 'التسبيح اليومي', aspect: 'faith', group: 'الأذكار', start: '2026-10-24' },
     { id: 'adhkar:morning', name: 'أذكار الصباح', aspect: 'faith', group: 'الأذكار' },
     { id: 'adhkar:evening', name: 'أذكار المساء', aspect: 'faith', group: 'الأذكار' },
     { id: 'adhkar:sleep', name: 'أذكار النوم', aspect: 'faith', group: 'الأذكار' },

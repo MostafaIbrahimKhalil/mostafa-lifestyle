@@ -16,7 +16,10 @@ export const MEALS = [
 // البنود الثابتة اللي بتتحسب في نسبة الالتزام (من غير مهام الشغل). day اختياري: عشان أيام الجيم
 export function trackedItemIds(settings, day = null) {
   const ids = []
-  for (const p of PRAYERS) ids.push(`prayer:${p.id}`, `tasbih:${p.id}`)
+  // التسبيح بقى هدف يومي واحد من ٢٤ أكتوبر (قبلها كان بعد كل صلاة)
+  const dailyTasbih = !day || day >= new Date(2026, 9, 24)
+  for (const p of PRAYERS) ids.push(`prayer:${p.id}`, ...(dailyTasbih ? [] : [`tasbih:${p.id}`]))
+  if (dailyTasbih) ids.push('tasbih:daily')
   ids.push('adhkar:morning', 'adhkar:evening', 'adhkar:sleep', 'teeth:am', 'teeth:pm', 'wird')
   if (settings.hifzEnabled !== false) ids.push('hifz')
   if (settings.waterEnabled !== false) ids.push('water')
@@ -86,6 +89,9 @@ export function buildDay(day, settings, { fasting = false } = {}) {
     time: new Date(times.sunrise.getTime() + (times.dhuhr - times.sunrise) / 2),
     hideTime: true,
   })
+
+  // التسبيح اليومي: هدف واحد في اليوم، بيفتح السبحة
+  rows.push({ type: 'tasbih', id: 'tasbih:daily', title: 'التسبيح اليومي', icon: 'beads', time: new Date(times.sunrise.getTime() + 5 * MIN), hideTime: true })
 
   // المية: كل كمية في وقتها وتتعلّم لوحدها
   if (settings.waterEnabled !== false) {

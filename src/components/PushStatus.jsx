@@ -1,7 +1,7 @@
 // حالة الإشعارات: عشان تعرف المشكلة فين لو مش بيوصلك حاجة
 import { useEffect, useState } from 'react'
 import { formatShortDate, formatTime, num } from '../lib/dates.js'
-import { pushSupported } from '../lib/push.js'
+import { pushSupported, serverStatus } from '../lib/push.js'
 import { isIOS } from '../lib/device.js'
 
 function ago(iso) {
@@ -23,6 +23,13 @@ export default function PushStatus({ settings, notif, standalone, busy, onRepair
       .catch(() => setHasSub(false))
   }, [notif, settings.pushLastSync])
 
+  const [server, setServer] = useState(null)
+  useEffect(() => {
+    serverStatus(settings.pushId)
+      .then(setServer)
+      .catch(() => setServer({ error: true }))
+  }, [settings.pushId, settings.pushLastSync])
+
   const syncAge = settings.pushLastSync ? (Date.now() - new Date(settings.pushLastSync).getTime()) / 3600000 : null
   const rows = [
     isIOS() && { ok: standalone, text: standalone ? 'مفتوح من الشاشة الرئيسية' : 'لازم تفتحه من الأيقونة اللي على الشاشة الرئيسية' },
@@ -33,6 +40,16 @@ export default function PushStatus({ settings, notif, standalone, busy, onRepair
       text: settings.pushLastSync
         ? `آخر تحديث لمواعيد الإشعارات ${ago(settings.pushLastSync)}${settings.pushScheduled ? ` (${num(settings.pushScheduled)} إشعار جاي)` : ''}`
         : 'مواعيد الإشعارات لسه ما اتبعتتش للسيرفر',
+    },
+    server && !server.error && {
+      ok: server.found,
+      text: server.found ? `السيرفر عنده اشتراكك و${num(server.scheduled)} إشعار جاي` : 'السيرفر مش لاقي اشتراكك',
+    },
+    server?.last && {
+      ok: server.last.status >= 200 && server.last.status < 300,
+      text: `آخر إشعار اتبعت ${ago(new Date(server.last.at).toISOString())} (${server.last.title}): ${
+        server.last.status < 300 ? 'وصل لسيرفر آبل ✓' : server.last.status === 410 || server.last.status === 404 ? 'الاشتراك اتلغى من الآيفون' : `آبل رفضه (${server.last.status})`
+      }`,
     },
   ].filter(Boolean)
   const next = settings.pushNext && settings.pushNext.at > Date.now() ? settings.pushNext : null

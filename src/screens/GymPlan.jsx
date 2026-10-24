@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, setSetting } from '../db.js'
 import { formatShortDate, fromKey, num } from '../lib/dates.js'
-import { DAY_NAMES, DEFAULT_GYM_DAYS, DEFAULT_GYM_TIME, EXERCISES, ROUTINES, WEEK_ORDER } from '../lib/workout.js'
+import { DAY_NAMES, DEFAULT_GYM_DAYS, DEFAULT_GYM_TIME, EXERCISES, GYM_SLOTS, ROUTINES, WEEK_ORDER, gymSlot } from '../lib/workout.js'
 
 const CHOICES = [
   ['', 'راحة'],
@@ -44,16 +44,16 @@ export default function GymPlan({ settings }) {
             </select>
           </label>
         ))}
-        <label className="field field-row">
-          <span>بعد العشا بنص ساعة</span>
-          <input
-            type="checkbox"
-            className="switch"
-            checked={settings.gymAfterIsha !== false}
-            onChange={(e) => setSetting('gymAfterIsha', e.target.checked)}
-          />
-        </label>
-        {settings.gymAfterIsha === false && (
+        <span className="tasks-label">معاد الجيم</span>
+        <div className="seg seg-small" role="radiogroup" aria-label="معاد الجيم">
+          {Object.entries(GYM_SLOTS).map(([id, label]) => (
+            <button key={id} className={gymSlot(settings) === id ? 'is-on' : ''} onClick={() => setSetting('gymSlot', id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {gymSlot(settings) === 'fajr' && <p className="muted small">تصلي الفجر وتنزل: الجيم بيبقى أول حاجة في يومك، بعد الفجر بحوالي ٢٥ دقيقة.</p>}
+        {gymSlot(settings) === 'fixed' && (
           <label className="field field-row">
             <span>معاد الجيم</span>
             <input
