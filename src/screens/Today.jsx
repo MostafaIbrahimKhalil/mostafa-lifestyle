@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import QuickAddSheet from '../components/QuickAddSheet.jsx'
+import HadithCard from '../components/HadithCard.jsx'
 import Icon from '../components/Icon.jsx'
 import { db, setCheck, setSetting } from '../db.js'
 import { useNow } from '../hooks.js'
@@ -230,6 +231,8 @@ export default function Today({ settings, onOpenTasks, onOpenAgenda, onOpenHifz,
           اللي جاي: <strong>{next.title}</strong> {formatTime(next.time)}، باقي {formatDuration(minutesBetween(now, next.time))}
         </p>
       )}
+
+      <HadithCard dateK={today} onOpenLibrary={() => onOpenSub('hadith')} />
 
       <PlanToday today={today} isToday={isToday} onOpenSub={onOpenSub} />
 

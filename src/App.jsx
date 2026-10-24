@@ -21,6 +21,7 @@ import Wallet from './screens/Wallet.jsx'
 import Plan from './screens/Plan.jsx'
 import Posts from './screens/Posts.jsx'
 import Baby from './screens/Baby.jsx'
+import Hadith from './screens/Hadith.jsx'
 import { seedPlan } from './lib/plan.js'
 import { gymEveryDay, gymForFatLoss, onePrayerNotification } from './lib/reminders.js'
 
@@ -163,6 +164,7 @@ export default function App() {
           {tab === 'more' && sub === 'year' && <Year settings={settings} />}
           {tab === 'more' && sub === 'settings' && <Settings settings={settings} />}
           {tab === 'more' && sub === 'hifz' && <Hifz settings={settings} />}
+          {tab === 'more' && sub === 'hadith' && <Hadith settings={settings} />}
           {tab === 'more' && sub === 'gym' && <GymPlan settings={settings} />}
           {tab === 'more' && sub === 'work' && <Work />}
           {tab === 'more' && sub === 'tasbih' && <Tasbih settings={settings} />}

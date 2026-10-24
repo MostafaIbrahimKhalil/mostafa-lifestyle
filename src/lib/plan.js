@@ -40,6 +40,7 @@ export async function seedPlan() {
         t.title = src.title
       }),
   )
+  await seedYaseen()
   if (await getSetting('seededPlan2026', false)) return
   const now = new Date().toISOString()
   await db.transaction('rw', [db.tasks, db.goals, db.posts, db.appts, db.settings], async () => {
@@ -68,6 +69,23 @@ export async function seedPlan() {
       await db.posts.bulkAdd(PLAN_POSTS.map((p) => ({ caption: '', edited: false, scheduled: false, published: false, ...p })))
     if ((await db.appts.count()) === 0) await db.appts.bulkAdd(PLAN_APPTS.map((a) => ({ done: false, ...a })))
     await setSetting('seededPlan2026', true)
+  })
+}
+
+// يس اتولد الخميس ٢٢ أكتوبر: العقيقة، وشهادة الميلاد، والتطعيمات
+async function seedYaseen() {
+  await db.transaction('rw', [db.tasks, db.appts, db.settings], async () => {
+    if (await getSetting('seededYaseen', false)) return
+    const now = new Date().toISOString()
+    await db.appts.add({ kind: 'family', title: 'عقيقة يس (يوم السابع)', date: '2026-10-28', place: '', note: 'السنة: الحلاقة والتسمية والعقيقة يوم السابع', done: false })
+    const base = { kind: 'once', done: false, active: true, createdAt: now, category: 'home', plan: 'yaseen' }
+    await db.tasks.bulkAdd([
+      { ...base, title: 'مكتب الصحة: شهادة ميلاد يس + كارت التطعيمات (آخر معاد للشهادة ٦ نوفمبر)', priority: 1, date: '2026-10-27' },
+      { ...base, title: 'اكتب مواعيد تطعيمات يس من الكارت في التطبيق', priority: 2, date: '2026-10-27' },
+      { ...base, title: 'تطعيم يس: الشهرين (اتأكد من المعاد في الكارت)', priority: 1, date: '2026-12-22' },
+    ])
+    await setSetting('yaseenBorn', '2026-10-22')
+    await setSetting('seededYaseen', true)
   })
 }
 

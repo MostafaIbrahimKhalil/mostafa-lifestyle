@@ -3786,3 +3786,41 @@ details[open] > summary.bal-head::after {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ===== الأحاديث ===== */
+.hadith-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hadith-item {
+  gap: 8px;
+}
+.hadith-text {
+  white-space: pre-line;
+  line-height: 2;
+  font-size: 16px;
+}
+.hadith-item .is-fav {
+  color: var(--gold);
+}
+.hadith-item .is-fav svg {
+  fill: currentColor;
+}
+.hadith-card .hadith-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hadith-card.is-open .hadith-text {
+  display: block;
+}
+.hadith-card .eyebrow {
+  color: var(--c-faith);
+  font-size: 13px;
+  font-weight: 600;
+}
